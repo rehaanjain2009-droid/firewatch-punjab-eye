@@ -59,7 +59,7 @@ export function SystemConsole() {
         return out.slice(-60);
       });
     }, 1800);
-    return () => clearInterval(t);
+    return () => { clearInterval(t); clearInterval(tk); };
   }, []);
 
   useEffect(() => {
