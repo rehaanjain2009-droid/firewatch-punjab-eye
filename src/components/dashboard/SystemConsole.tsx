@@ -87,8 +87,8 @@ export function SystemConsole() {
             <span className="text-foreground/90">{l.msg}</span>
           </div>
         ))}
-        <div className="flex gap-3 px-1 -mx-1">
-          <span className="text-muted-foreground">{nowTs()}</span>
+        <div className="flex gap-3 px-1 -mx-1" suppressHydrationWarning>
+          <span className="text-muted-foreground">{tick || "--:--:--"}</span>
           <span className="text-primary ticker">▌</span>
           <span className="text-muted-foreground">awaiting next CRON tick…</span>
         </div>
