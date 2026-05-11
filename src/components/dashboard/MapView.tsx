@@ -72,9 +72,15 @@ export function MapView() {
           <h2 className="text-sm font-bold tracking-wide">TACTICAL GIS · LUDHIANA SECTOR</h2>
           <span className="text-mono text-[10px] text-muted-foreground">30.9010°N · 75.8573°E</span>
         </div>
-        <div className="flex items-center gap-1.5 text-mono text-[10px] text-muted-foreground">
-          <span className="h-1.5 w-1.5 rounded-full bg-primary ticker" />
-          <span>{HOTSPOTS.length} HOTSPOTS · LAST SYNC 00:42s</span>
+        <div className="flex items-center gap-3 text-mono text-[10px] text-muted-foreground">
+          <span className={`flex items-center gap-1.5 rounded px-1.5 py-0.5 border ${live.on ? "border-[oklch(0.85_0.18_155)/40] text-[oklch(0.85_0.18_155)]" : "border-muted-foreground/20"}`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${live.on ? "bg-[oklch(0.85_0.18_155)] shadow-[0_0_8px_currentColor]" : "bg-muted-foreground/40"}`} />
+            {live.on ? `LIVE GEE · ${live.count} px` : "GEE · OFFLINE"}
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-primary ticker" />
+            {HOTSPOTS.length} HOTSPOTS · LAST SYNC 00:42s
+          </span>
         </div>
       </div>
 
