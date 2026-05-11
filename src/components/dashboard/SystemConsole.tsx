@@ -44,9 +44,12 @@ function nowTs() {
 
 export function SystemConsole() {
   const [logs, setLogs] = useState<LogEntry[]>(SEED);
+  const [tick, setTick] = useState<string>("");
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    setTick(nowTs());
+    const tk = setInterval(() => setTick(nowTs()), 1000);
     let i = 0;
     const t = setInterval(() => {
       const next = STREAM[i % STREAM.length];
