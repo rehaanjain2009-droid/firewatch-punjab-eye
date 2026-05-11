@@ -39,9 +39,24 @@ type LayerId = typeof LAYERS[number]["id"];
 const sevColor = (s: Hotspot["severity"]) =>
   s === "high" ? "oklch(0.65 0.24 25)" : s === "med" ? "oklch(0.82 0.17 80)" : "oklch(0.78 0.18 155)";
 
+const PUNJAB_BBOX = { w: 73.9, s: 29.5, e: 76.9, n: 32.5 };
+
 export function MapView() {
   const [active, setActive] = useState<Set<LayerId>>(new Set(["base", "firms", "crop"]));
   const [selected, setSelected] = useState<Hotspot | null>(HOTSPOTS[0]);
+  const [live, setLive] = useState<{ on: boolean; count: number }>({ on: false, count: 0 });
+  const fetchFires = useServerFn(getActiveFires);
+
+  useEffect(() => {
+    let mounted = true;
+    fetchFires()
+      .then((r) => {
+        if (!mounted) return;
+        if (r.live) setLive({ on: true, count: r.fires.length });
+      })
+      .catch(() => {});
+    return () => { mounted = false; };
+  }, [fetchFires]);
 
   const toggle = (id: LayerId) => {
     const next = new Set(active);
