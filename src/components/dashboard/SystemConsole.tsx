@@ -44,9 +44,12 @@ function nowTs() {
 
 export function SystemConsole() {
   const [logs, setLogs] = useState<LogEntry[]>(SEED);
+  const [tick, setTick] = useState<string>("");
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    setTick(nowTs());
+    const tk = setInterval(() => setTick(nowTs()), 1000);
     let i = 0;
     const t = setInterval(() => {
       const next = STREAM[i % STREAM.length];
@@ -56,7 +59,7 @@ export function SystemConsole() {
         return out.slice(-60);
       });
     }, 1800);
-    return () => clearInterval(t);
+    return () => { clearInterval(t); clearInterval(tk); };
   }, []);
 
   useEffect(() => {
@@ -84,8 +87,8 @@ export function SystemConsole() {
             <span className="text-foreground/90">{l.msg}</span>
           </div>
         ))}
-        <div className="flex gap-3 px-1 -mx-1">
-          <span className="text-muted-foreground">{nowTs()}</span>
+        <div className="flex gap-3 px-1 -mx-1" suppressHydrationWarning>
+          <span className="text-muted-foreground">{tick || "--:--:--"}</span>
           <span className="text-primary ticker">▌</span>
           <span className="text-muted-foreground">awaiting next CRON tick…</span>
         </div>
