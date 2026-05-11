@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Layers, Map as MapIcon, Flame, Satellite, Sprout, Crosshair, MapPin, X } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { getActiveFires } from "@/lib/gee.functions";
 
 type Hotspot = {
   id: string;
