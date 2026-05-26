@@ -320,3 +320,19 @@ export async function fetchActiveFires(hours = 24): Promise<FirePoint[] | null> 
   cachedFires = { ts: Date.now(), data: points };
   return points;
 }
+
+export async function fetchActiveFiresVerbose(hours = 24): Promise<{
+  ok: boolean; count?: number; httpStatus?: number; httpBody?: string; message?: string; sample?: unknown;
+}> {
+  const token = await getAccessToken();
+  const project = getProjectId();
+  if (!token || !project) return { ok: false, message: "no token or project" };
+  // Force fresh
+  cachedFires = null;
+  const data = await fetchActiveFires(hours);
+  if (data === null) {
+    return { ok: false, message: "fetchActiveFires returned null — check server logs for GEE compute error" };
+  }
+  return { ok: true, count: data.length, sample: data[0] ?? null };
+}
+
