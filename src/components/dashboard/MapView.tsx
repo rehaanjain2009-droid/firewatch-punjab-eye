@@ -45,10 +45,13 @@ export function MapView() {
   const [active, setActive] = useState<Set<LayerId>>(new Set(["base", "firms", "crop"]));
   const [selected, setSelected] = useState<Hotspot | null>(HOTSPOTS[0]);
   const [live, setLive] = useState<{ on: boolean; count: number }>({ on: false, count: 0 });
+  const [diag, setDiag] = useState<null | { step: string; ok: boolean; message: string; httpStatus?: number; httpBody?: string; projectId?: string | null; clientEmail?: string }>(null);
   const fetchFires = useServerFn(getActiveFires);
+  const fetchStatus = useServerFn(getGeeStatus);
 
   useEffect(() => {
     let mounted = true;
+    fetchStatus().then((s) => { if (mounted) setDiag(s as any); }).catch(() => {});
     fetchFires()
       .then((r) => {
         if (!mounted) return;
@@ -56,7 +59,7 @@ export function MapView() {
       })
       .catch(() => {});
     return () => { mounted = false; };
-  }, [fetchFires]);
+  }, [fetchFires, fetchStatus]);
 
   const toggle = (id: LayerId) => {
     const next = new Set(active);
