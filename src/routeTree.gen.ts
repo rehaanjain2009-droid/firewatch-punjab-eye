@@ -10,33 +10,43 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiGeeDebugRouteImport } from './routes/api/gee-debug'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiGeeDebugRoute = ApiGeeDebugRouteImport.update({
+  id: '/api/gee-debug',
+  path: '/api/gee-debug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/gee-debug': typeof ApiGeeDebugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/gee-debug': typeof ApiGeeDebugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/gee-debug': typeof ApiGeeDebugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/api/gee-debug'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/api/gee-debug'
+  id: '__root__' | '/' | '/api/gee-debug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiGeeDebugRoute: typeof ApiGeeDebugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +58,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/gee-debug': {
+      id: '/api/gee-debug'
+      path: '/api/gee-debug'
+      fullPath: '/api/gee-debug'
+      preLoaderRoute: typeof ApiGeeDebugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiGeeDebugRoute: ApiGeeDebugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
