@@ -87,6 +87,20 @@ export function MapView() {
         </div>
       </div>
 
+      {diag && !diag.ok && (
+        <div className="border-b border-[oklch(0.65_0.24_25)/40] bg-[oklch(0.65_0.24_25)/10] px-4 py-2 text-mono text-[11px] text-[oklch(0.85_0.18_25)]">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <div className="flex-1 space-y-0.5">
+              <div className="font-bold uppercase tracking-wider">GEE AUTH FAIL · step={diag.step}{diag.httpStatus ? ` · HTTP ${diag.httpStatus}` : ""}</div>
+              <div className="text-foreground/90">{diag.message}</div>
+              {diag.clientEmail && <div className="text-muted-foreground">SA: {diag.clientEmail} → project: {diag.projectId ?? "—"}</div>}
+              {diag.httpBody && <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap rounded bg-background/60 p-1.5 text-[10px] text-foreground/80">{diag.httpBody}</pre>}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="relative flex-1 overflow-hidden">
         {/* Base map: synthetic tactical terrain */}
         <div className="absolute inset-0 bg-[oklch(0.20_0.025_252)]">
