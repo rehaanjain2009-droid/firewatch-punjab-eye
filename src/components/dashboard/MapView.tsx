@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Layers, Map as MapIcon, Flame, Satellite, Sprout, Crosshair, MapPin, X } from "lucide-react";
+import { Layers, Map as MapIcon, Flame, Satellite, Sprout, Crosshair, MapPin, X, AlertTriangle } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
-import { getActiveFires } from "@/lib/gee.functions";
+import { getActiveFires, getGeeStatus } from "@/lib/gee.functions";
 
 type Hotspot = {
   id: string;
@@ -45,10 +45,13 @@ export function MapView() {
   const [active, setActive] = useState<Set<LayerId>>(new Set(["base", "firms", "crop"]));
   const [selected, setSelected] = useState<Hotspot | null>(HOTSPOTS[0]);
   const [live, setLive] = useState<{ on: boolean; count: number }>({ on: false, count: 0 });
+  const [diag, setDiag] = useState<null | { step: string; ok: boolean; message: string; httpStatus?: number; httpBody?: string; projectId?: string | null; clientEmail?: string }>(null);
   const fetchFires = useServerFn(getActiveFires);
+  const fetchStatus = useServerFn(getGeeStatus);
 
   useEffect(() => {
     let mounted = true;
+    fetchStatus().then((s) => { if (mounted) setDiag(s as any); }).catch(() => {});
     fetchFires()
       .then((r) => {
         if (!mounted) return;
@@ -56,7 +59,7 @@ export function MapView() {
       })
       .catch(() => {});
     return () => { mounted = false; };
-  }, [fetchFires]);
+  }, [fetchFires, fetchStatus]);
 
   const toggle = (id: LayerId) => {
     const next = new Set(active);
@@ -83,6 +86,20 @@ export function MapView() {
           </span>
         </div>
       </div>
+
+      {diag && !diag.ok && (
+        <div className="border-b border-[oklch(0.65_0.24_25)/40] bg-[oklch(0.65_0.24_25)/10] px-4 py-2 text-mono text-[11px] text-[oklch(0.85_0.18_25)]">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <div className="flex-1 space-y-0.5">
+              <div className="font-bold uppercase tracking-wider">GEE AUTH FAIL · step={diag.step}{diag.httpStatus ? ` · HTTP ${diag.httpStatus}` : ""}</div>
+              <div className="text-foreground/90">{diag.message}</div>
+              {diag.clientEmail && <div className="text-muted-foreground">SA: {diag.clientEmail} → project: {diag.projectId ?? "—"}</div>}
+              {diag.httpBody && <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap rounded bg-background/60 p-1.5 text-[10px] text-foreground/80">{diag.httpBody}</pre>}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="relative flex-1 overflow-hidden">
         {/* Base map: synthetic tactical terrain */}
