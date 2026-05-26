@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { diagnoseGee } from "@/lib/gee.server";
 
-export const Route = createFileRoute("/api/gee-debug")({
+export const Route = createFileRoute("/api/public/gee-debug")({
   server: {
     handlers: {
       GET: async () => {
