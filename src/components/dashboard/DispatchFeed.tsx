@@ -1,5 +1,7 @@
 import { useState, useMemo } from "react";
-import { Copy, Send, Clock, AlertTriangle, Radio, Check } from "lucide-react";
+import { Copy, Send, Clock, AlertTriangle, Radio, Check, Loader2 } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { dispatchTelegram } from "@/lib/gee.functions";
 import type { LiveFire } from "./MapView";
 
 function confTone(c: number) {
