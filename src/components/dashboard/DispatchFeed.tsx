@@ -24,7 +24,10 @@ type Props = { fires: LiveFire[]; live: boolean };
 export function DispatchFeed({ fires, live }: Props) {
   const [copied, setCopied] = useState<string | null>(null);
   const [dispatched, setDispatched] = useState<Set<string>>(new Set());
-  const [acked, setAcked] = useState<Set<string>>(new Set());
+  const [sending, setSending] = useState<Set<string>>(new Set());
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [acked] = useState<Set<string>>(new Set());
+  const sendDispatch = useServerFn(dispatchTelegram);
 
   const sorted = useMemo(() => [...fires].sort((a, b) => b.confidence - a.confidence), [fires]);
   const unhandled = sorted.filter((f) => !dispatched.has(f.id) && !acked.has(f.id)).length;
@@ -34,6 +37,35 @@ export function DispatchFeed({ fires, live }: Props) {
     navigator.clipboard?.writeText(url).catch(() => {});
     setCopied(f.id);
     setTimeout(() => setCopied(null), 1600);
+  };
+
+  const handleDispatch = async (f: LiveFire) => {
+    if (sending.has(f.id) || dispatched.has(f.id)) return;
+    setSending((s) => new Set(s).add(f.id));
+    setErrors((e) => { const n = { ...e }; delete n[f.id]; return n; });
+    try {
+      const r = await sendDispatch({
+        data: {
+          block: f.block,
+          lat: f.lat,
+          lng: f.lng,
+          confidence: f.confidence,
+          frp: f.frp,
+          acqDate: f.acqDate,
+          acqTime: f.acqTime,
+          satellite: f.satellite,
+        },
+      });
+      if (r.ok) {
+        setDispatched((s) => new Set(s).add(f.id));
+      } else {
+        setErrors((e) => ({ ...e, [f.id]: `HTTP ${r.status}: ${r.body.slice(0, 80)}` }));
+      }
+    } catch (err) {
+      setErrors((e) => ({ ...e, [f.id]: (err as Error).message }));
+    } finally {
+      setSending((s) => { const n = new Set(s); n.delete(f.id); return n; });
+    }
   };
 
   return (
