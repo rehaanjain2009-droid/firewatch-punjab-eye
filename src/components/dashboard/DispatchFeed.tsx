@@ -1,5 +1,7 @@
 import { useState, useMemo } from "react";
-import { Copy, Send, Clock, AlertTriangle, Radio, Check } from "lucide-react";
+import { Copy, Send, Clock, AlertTriangle, Radio, Check, Loader2 } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { dispatchTelegram } from "@/lib/gee.functions";
 import type { LiveFire } from "./MapView";
 
 function confTone(c: number) {
@@ -22,7 +24,10 @@ type Props = { fires: LiveFire[]; live: boolean };
 export function DispatchFeed({ fires, live }: Props) {
   const [copied, setCopied] = useState<string | null>(null);
   const [dispatched, setDispatched] = useState<Set<string>>(new Set());
-  const [acked, setAcked] = useState<Set<string>>(new Set());
+  const [sending, setSending] = useState<Set<string>>(new Set());
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [acked] = useState<Set<string>>(new Set());
+  const sendDispatch = useServerFn(dispatchTelegram);
 
   const sorted = useMemo(() => [...fires].sort((a, b) => b.confidence - a.confidence), [fires]);
   const unhandled = sorted.filter((f) => !dispatched.has(f.id) && !acked.has(f.id)).length;
@@ -32,6 +37,35 @@ export function DispatchFeed({ fires, live }: Props) {
     navigator.clipboard?.writeText(url).catch(() => {});
     setCopied(f.id);
     setTimeout(() => setCopied(null), 1600);
+  };
+
+  const handleDispatch = async (f: LiveFire) => {
+    if (sending.has(f.id) || dispatched.has(f.id)) return;
+    setSending((s) => new Set(s).add(f.id));
+    setErrors((e) => { const n = { ...e }; delete n[f.id]; return n; });
+    try {
+      const r = await sendDispatch({
+        data: {
+          block: f.block,
+          lat: f.lat,
+          lng: f.lng,
+          confidence: f.confidence,
+          frp: f.frp,
+          acqDate: f.acqDate,
+          acqTime: f.acqTime,
+          satellite: f.satellite,
+        },
+      });
+      if (r.ok) {
+        setDispatched((s) => new Set(s).add(f.id));
+      } else {
+        setErrors((e) => ({ ...e, [f.id]: `HTTP ${r.status}: ${r.body.slice(0, 80)}` }));
+      }
+    } catch (err) {
+      setErrors((e) => ({ ...e, [f.id]: (err as Error).message }));
+    } finally {
+      setSending((s) => { const n = new Set(s); n.delete(f.id); return n; });
+    }
   };
 
   return (
@@ -94,17 +128,28 @@ export function DispatchFeed({ fires, live }: Props) {
                   {copied === f.id ? <><Check className="h-3.5 w-3.5 text-primary" /> Route copied</> : <><Copy className="h-3.5 w-3.5" /> Copy GMaps Route</>}
                 </button>
                 <button
-                  onClick={() => setDispatched((s) => new Set(s).add(f.id))}
-                  disabled={isDispatched}
+                  onClick={() => handleDispatch(f)}
+                  disabled={isDispatched || sending.has(f.id)}
                   className={`flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-bold transition-opacity ${
                     isDispatched
                       ? "bg-[oklch(0.78_0.18_155/0.15)] text-[oklch(0.85_0.18_155)] border border-[oklch(0.78_0.18_155/0.4)] cursor-default"
-                      : "bg-[oklch(0.65_0.24_25)] text-white hover:opacity-90 glow-crimson"
+                      : "bg-[oklch(0.65_0.24_25)] text-white hover:opacity-90 glow-crimson disabled:opacity-60"
                   }`}
                 >
-                  {isDispatched ? <><Check className="h-3.5 w-3.5" /> Dispatched</> : <><Send className="h-3.5 w-3.5" /> Force Telegram Dispatch</>}
+                  {isDispatched ? (
+                    <><Check className="h-3.5 w-3.5" /> Dispatched</>
+                  ) : sending.has(f.id) ? (
+                    <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Sending…</>
+                  ) : (
+                    <><Send className="h-3.5 w-3.5" /> Force Telegram Dispatch</>
+                  )}
                 </button>
               </div>
+              {errors[f.id] && (
+                <div className="mt-2 text-mono text-[10px] text-[oklch(0.78_0.22_25)] break-all">
+                  ⚠ {errors[f.id]}
+                </div>
+              )}
             </article>
           );
         })}
