@@ -128,17 +128,28 @@ export function DispatchFeed({ fires, live }: Props) {
                   {copied === f.id ? <><Check className="h-3.5 w-3.5 text-primary" /> Route copied</> : <><Copy className="h-3.5 w-3.5" /> Copy GMaps Route</>}
                 </button>
                 <button
-                  onClick={() => setDispatched((s) => new Set(s).add(f.id))}
-                  disabled={isDispatched}
+                  onClick={() => handleDispatch(f)}
+                  disabled={isDispatched || sending.has(f.id)}
                   className={`flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-bold transition-opacity ${
                     isDispatched
                       ? "bg-[oklch(0.78_0.18_155/0.15)] text-[oklch(0.85_0.18_155)] border border-[oklch(0.78_0.18_155/0.4)] cursor-default"
-                      : "bg-[oklch(0.65_0.24_25)] text-white hover:opacity-90 glow-crimson"
+                      : "bg-[oklch(0.65_0.24_25)] text-white hover:opacity-90 glow-crimson disabled:opacity-60"
                   }`}
                 >
-                  {isDispatched ? <><Check className="h-3.5 w-3.5" /> Dispatched</> : <><Send className="h-3.5 w-3.5" /> Force Telegram Dispatch</>}
+                  {isDispatched ? (
+                    <><Check className="h-3.5 w-3.5" /> Dispatched</>
+                  ) : sending.has(f.id) ? (
+                    <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Sending…</>
+                  ) : (
+                    <><Send className="h-3.5 w-3.5" /> Force Telegram Dispatch</>
+                  )}
                 </button>
               </div>
+              {errors[f.id] && (
+                <div className="mt-2 text-mono text-[10px] text-[oklch(0.78_0.22_25)] break-all">
+                  ⚠ {errors[f.id]}
+                </div>
+              )}
             </article>
           );
         })}
