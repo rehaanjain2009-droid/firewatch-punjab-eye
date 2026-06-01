@@ -12,8 +12,8 @@ export const Route = createFileRoute("/")({
   component: Dashboard,
   head: () => ({
     meta: [
-      { title: "PPF Command & Control · Stubble Fire Intelligence" },
-      { name: "description", content: "Punjab Police & Forestry tactical dashboard for real-time monitoring and dispatch on illegal agricultural stubble fires across the Ludhiana sector." },
+      { title: "TSDR Command & Control · Karimnagar Wildfire Intelligence" },
+      { name: "description", content: "Telangana State Disaster Response tactical dashboard for real-time NASA FIRMS detections, Sentinel-2 burn-scar overlays, and field dispatch across the Karimnagar sector." },
     ],
   }),
 });
