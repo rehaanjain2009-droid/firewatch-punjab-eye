@@ -171,7 +171,7 @@ function confToNum(c: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-export async function fetchActiveFires(dayRange = 1): Promise<{ fires: FirePoint[]; source: string } | null> {
+export async function fetchActiveFires(dayRange = 2): Promise<{ fires: FirePoint[]; source: string } | null> {
   const key = process.env.FIRMS_MAP_KEY;
   if (!key) return null;
   if (cachedFires && Date.now() - cachedFires.ts < 5 * 60_000) {
