@@ -71,11 +71,11 @@ export function StatusHeader() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-sm font-bold tracking-wide text-foreground">PPF · COMMAND & CONTROL</h1>
+                <h1 className="text-sm font-bold tracking-wide text-foreground">TSDR · COMMAND & CONTROL</h1>
                 <Pill tone="emerald"><span className="h-1.5 w-1.5 rounded-full bg-current ticker" />OPERATIONAL</Pill>
               </div>
               <p className="text-[11px] text-muted-foreground text-mono">
-                Punjab Police & Forestry · Stubble Fire Intelligence Grid · Ludhiana Sector
+                Telangana State Disaster Response · Stubble & Wildfire Intelligence Grid · Karimnagar Sector
               </p>
             </div>
           </div>
@@ -83,7 +83,7 @@ export function StatusHeader() {
             <Radio className="h-3.5 w-3.5 text-primary" />
             <span>OPERATOR: <span className="text-foreground">INSP. R. SANDHU</span></span>
             <span className="opacity-40">|</span>
-            <span>STATION: <span className="text-foreground">LDH-CMD-01</span></span>
+            <span>STATION: <span className="text-foreground">KNR-CMD-01</span></span>
             <span className="opacity-40">|</span>
             <span className="text-foreground" id="utc-clock">--:--:-- IST</span>
           </div>
