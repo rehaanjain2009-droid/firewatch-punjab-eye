@@ -130,7 +130,8 @@ export async function diagnoseGee(): Promise<GeeDiagnostic> {
 // NASA FIRMS — direct REST (live fire points)
 // ============================================================
 
-export const PUNJAB_BBOX = [73.9, 29.5, 76.9, 32.5] as const;
+// Test focus: Karimnagar / Telangana region around 18.15351, 79.5154
+export const PUNJAB_BBOX = [78.0, 16.5, 81.0, 19.7] as const;
 
 export type FirePoint = {
   id: string;
