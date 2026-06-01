@@ -18,7 +18,7 @@ export type LiveFire = {
 type Diag = null | { ok: boolean; step: string; message: string; httpStatus?: number; httpBody?: string; clientEmail?: string; projectId?: string | null };
 type Tile = { id: "nbr" | "cropland"; label: string; tileUrl: string };
 
-const PUNJAB_BBOX = { w: 73.9, s: 29.5, e: 76.9, n: 32.5 };
+const PUNJAB_BBOX = { w: 78.0, s: 16.5, e: 81.0, n: 19.7 };
 
 const LAYERS = [
   { id: "base", label: "Base Map", icon: MapIcon },
