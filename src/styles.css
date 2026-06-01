@@ -161,3 +161,28 @@
     animation: sweep 6s linear infinite;
   }
 }
+
+/* Leaflet overrides — blend with the dark tactical panel */
+.leaflet-container {
+  background: oklch(0.20 0.025 252);
+  font-family: inherit;
+  outline: none;
+}
+.leaflet-control-attribution {
+  background: oklch(0.18 0.02 252 / 0.7) !important;
+  color: oklch(0.7 0.02 252) !important;
+  font-size: 9px !important;
+  padding: 1px 6px !important;
+}
+.leaflet-control-attribution a { color: oklch(0.78 0.10 220) !important; }
+.leaflet-control-zoom a {
+  background: oklch(0.22 0.025 252) !important;
+  color: oklch(0.85 0.02 252) !important;
+  border-color: oklch(0.32 0.03 252) !important;
+}
+.leaflet-control-zoom a:hover { background: oklch(0.28 0.03 252) !important; }
+.fire-marker { position: relative; }
+.fire-marker .ring {
+  position: absolute; inset: 0; border-radius: 9999px;
+  animation: pulse-ring 1.8s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
