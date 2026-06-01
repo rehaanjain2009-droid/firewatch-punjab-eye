@@ -1,74 +1,45 @@
 ## Goal
-Replace the dashboard's mock hotspot/satellite data with real Google Earth Engine (GEE) computations: NASA FIRMS active fires, Sentinel-2 NBR burn scars, and ESA WorldCover cropland masking — restricted to Punjab.
+Make the hourly "scan FIRMS → push high-confidence fires to Telegram" automation run automatically inside Lovable, with no external scheduler (no cron-job.org, no GitHub Actions, no manual curl).
 
-## How Earth Engine works (short version)
-GEE is a server-side geospatial compute platform. You don't download raw imagery — you describe a computation (filter collection → mask → reduce → export) using their JS/Python API, and Google's servers run it on petabytes of satellite data and return either:
-- **Tile URLs** (XYZ map tiles) to render on a Leaflet/Mapbox map, or
-- **JSON feature lists** (e.g. lat/lng + confidence for each fire pixel) via `getInfo()` / `evaluate()`.
+## Approach
+Lovable Cloud (Supabase under the hood) ships with `pg_cron` + `pg_net`. We schedule a database job that POSTs to the existing `/api/public/cron-dispatch` endpoint every hour. The endpoint, dedup cache, and Telegram sending logic already exist — we only add the scheduler.
 
-Auth is **OAuth 2.0 via a Google Cloud service account** — not a simple API key. That service account JSON must stay server-side (never in the browser).
+## Steps
 
-## What I need from you
-To wire this up, please provide / do the following on the Google side. None of it requires code changes from you — just one-time setup in Google Cloud + Earth Engine consoles:
+1. **Enable Lovable Cloud** (if not already enabled) so we get a managed Postgres with `pg_cron` and `pg_net`. Required only for the scheduler — no tables, no auth, no app data is added.
 
-1. **Create / pick a Google Cloud project** (e.g. `punjab-firmap`).
-2. **Register the project for Earth Engine** at https://code.earthengine.google.com/register — choose "Use without a Cloud project" → No, then select your Cloud project. Pick *Commercial* or *Noncommercial/Academic* (free for govt/research use; PPF likely qualifies as noncommercial).
-3. **Enable the Earth Engine API** for that project: https://console.cloud.google.com/apis/library/earthengine.googleapis.com
-4. **Create a service account** in IAM → Service Accounts:
-   - Name: e.g. `gee-ppf-bot`
-   - Role: `Earth Engine Resource Viewer` (and `Service Usage Consumer`)
-5. **Register the service account** with EE: https://signup.earthengine.google.com/#!/service_accounts
-6. **Create a JSON key** for that service account and download it.
-7. **Paste the JSON contents** to me — I will store it as a Lovable Cloud secret named `GEE_SERVICE_ACCOUNT_JSON` (never committed to code, never exposed to browser).
-8. Confirm the **Cloud project ID** so I can use it in API calls.
+2. **Migration** — enable extensions and register the cron job:
+   ```sql
+   create extension if not exists pg_cron;
+   create extension if not exists pg_net;
 
-Optional but recommended:
-- Tell me your preferred **AOI bbox** (currently I'm using Punjab ~ `[73.9, 29.5, 76.9, 32.5]`).
-- Confirm the **NASA FIRMS product** (VIIRS_SNPP_NRT vs MODIS) and confidence threshold (default 70%).
+   select cron.schedule(
+     'firms-telegram-hourly',
+     '0 * * * *',  -- top of every hour UTC
+     $$
+     select net.http_post(
+       url := 'https://project--95489fd0-c93e-4275-8154-4296500d92e4.lovable.app/api/public/cron-dispatch',
+       headers := jsonb_build_object(
+         'content-type','application/json',
+         'x-cron-secret', current_setting('app.cron_secret', true)
+       ),
+       body := '{}'::jsonb
+     );
+     $$
+   );
+   ```
+   The `CRON_SECRET` is stored via `ALTER DATABASE ... SET app.cron_secret = '...'` so it isn't hardcoded in the migration. We use the stable `project--<id>.lovable.app` host so the URL never breaks on rename/republish.
 
-## Plan once credentials are in place
+3. **Point the cron at the right deployment** — published URL once the app is published; until then, swap to `project--<id>-dev.lovable.app` so it hits the preview build. I'll default to the published URL and note the one-line swap.
 
-### Architecture
-```
-Browser ──► TanStack server fn ──► Earth Engine REST API
-                  │                       │
-                  ▼                       ▼
-          GEE_SERVICE_ACCOUNT_JSON   tile URLs / JSON
-                  │
-                  ▼
-          5-min in-memory cache
-```
+4. **Verify** — after the migration runs, query `cron.job` and `cron.job_run_details` to confirm the schedule is registered and the first POST returned 200, plus tail `server-function-logs` for `/api/public/cron-dispatch`.
 
-We use the **Earth Engine REST API** (`https://earthengine.googleapis.com/v1/`) directly with an OAuth2 access token minted from the service account JWT. This avoids the `@google/earthengine` npm package, which is Node-only and won't run in the Cloudflare Worker SSR runtime.
+5. **UI surfacing (small)** — add a "Last automated scan" line in `SystemConsole` that reads the latest successful run timestamp from the cron endpoint response (cached in module state), so the dispatcher can see automation is alive without leaving the dashboard.
 
-### Server functions (`src/lib/gee.functions.ts` + `gee.server.ts`)
-1. `getAccessToken()` — sign JWT with service account private key (using Web Crypto, Worker-compatible), exchange for OAuth token, cache 50min.
-2. `getActiveFires({ bbox, hours })` — runs an EE expression:
-   - `ee.FeatureCollection('FIRMS')` filtered by date + bbox
-   - intersected with `ee.Image('ESA/WorldCover/v200').eq(40)` cropland mask
-   - `.getInfo()` → list of `{lat, lng, confidence, acq_time}` fed to `MapView` markers + `DispatchFeed`.
-3. `getFirmsTileUrl()` / `getNbrTileUrl()` / `getCroplandTileUrl()` — call `getMapId` to get XYZ tile templates for the three map layers.
-4. `getHourlyHistogram({ bbox, days })` — reduce FIRMS by hour-of-day for the analytics chart.
+## What I will NOT do
+- No external cron services.
+- No new secrets beyond what's already configured (`CRON_SECRET`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `FIRMS_MAP_KEY` are already in place).
+- No changes to the dispatch logic, dedup, or Telegram formatting — those already work.
 
-### Client wiring
-- Replace map background `<div>` with **react-leaflet** + an OpenStreetMap base, then overlay the three GEE tile layers (toggleable as today).
-- Replace `HOTSPOTS` constant with a `useQuery` hook hitting `getActiveFires`. Auto-refresh every 5 min.
-- Replace `HourlyChart` mock data with `getHourlyHistogram`.
-- Wire `SystemConsole` to log real cron ticks and EE response codes from the server.
-
-### Caching & limits
-- 5-minute server-side cache per (bbox, layer) — EE quotas are generous but not infinite.
-- Tile URLs from `getMapId` are valid for ~24h; refresh on demand.
-
-### Dependencies to add
-- `react-leaflet`, `leaflet` (frontend map)
-- `@tanstack/react-query` (already present likely; for polling)
-- `jose` (JWT signing — Worker-safe, pure JS)
-
-### Fix during this work
-Hydration mismatch in `SystemConsole` from `nowTs()` running at SSR vs client time — gate timestamp rendering behind a `useEffect`/mounted flag.
-
-## Out of scope for this plan
-- Per-user OAuth (we use a single service-account identity, which is what GEE expects for backend apps).
-- Exporting large rasters to Drive/GCS (not needed for the dashboard).
-- Telegram bot wiring (separate request).
+## One confirmation needed
+Schedule cadence: **every hour on the hour** (`0 * * * *`) as originally requested, or tighter (e.g. every 15 min `*/15 * * * *`)? FIRMS data refreshes every ~3 hours, so hourly is the sweet spot — I'll go with hourly unless you say otherwise.
