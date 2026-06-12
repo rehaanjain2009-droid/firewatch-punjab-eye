@@ -22,7 +22,7 @@ function escapeHtml(s: string) {
 }
 
 export function buildMessage(f: DispatchInput): string {
-  const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${f.lat},${f.lng}&travelmode=driving`;
+  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${f.lat},${f.lng}`;
   const sev = f.confidence >= 80 ? "🚨 CRITICAL" : f.confidence >= 60 ? "⚠️ HIGH" : "📡 REVIEW";
   return [
     `<b>${sev} · STUBBLE FIRE DETECTED</b>`,
@@ -34,7 +34,7 @@ export function buildMessage(f: DispatchInput): string {
     `🔥 <b>Fire Radiative Power:</b> ${f.frp.toFixed(1)} MW`,
     `🧭 <b>Coordinates:</b> ${f.lat.toFixed(4)}, ${f.lng.toFixed(4)}`,
     ``,
-    `🗺 <a href="${mapsUrl}">Open Route in Google Maps</a>`,
+    `🗺 <a href="${mapsUrl}">Open in Google Maps</a>`,
   ].join("\n");
 }
 
