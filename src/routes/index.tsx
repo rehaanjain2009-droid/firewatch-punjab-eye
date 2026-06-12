@@ -76,15 +76,24 @@ function Dashboard() {
     return () => { mounted = false; };
   }, [fetchFires, fetchStatus, fetchTiles]);
 
+function ClientMapView(props: React.ComponentProps<typeof MapView>) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return <div className="panel h-full flex items-center justify-center text-muted-foreground text-sm">Loading map…</div>;
+  return (
+    <Suspense fallback={<div className="panel h-full flex items-center justify-center text-muted-foreground text-sm">Loading map…</div>}>
+      <MapView {...props} />
+    </Suspense>
+  );
+}
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <StatusHeader />
       <main className="mx-auto max-w-[1600px] px-5 py-4 space-y-4">
         <section className="grid gap-4 lg:grid-cols-5">
           <div className="lg:col-span-3 h-[560px]">
-            <Suspense fallback={<div className="panel h-full flex items-center justify-center text-muted-foreground text-sm">Loading map…</div>}>
-              <MapView fires={fires} live={firesLive} source={firesSource} tiles={tiles} diag={diag} />
-            </Suspense>
+            <ClientMapView fires={fires} live={firesLive} source={firesSource} tiles={tiles} diag={diag} />
           </div>
           <div className="lg:col-span-2 h-[560px]">
             <DispatchFeed fires={fires} live={firesLive} />
