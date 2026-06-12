@@ -1,40 +1,42 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { StatusHeader } from "@/components/dashboard/StatusHeader";
-import { MapView, type LiveFire } from "@/components/dashboard/MapView";
+import type { LiveFire } from "@/components/dashboard/MapView";
 import { DispatchFeed } from "@/components/dashboard/DispatchFeed";
 import { HourlyChart } from "@/components/dashboard/HourlyChart";
 import { SystemConsole } from "@/components/dashboard/SystemConsole";
 import { getActiveFires, getGeeStatus, getTileLayers } from "@/lib/gee.functions";
 
+const MapView = lazy(() => import("@/components/dashboard/MapView").then((m) => ({ default: m.MapView })));
+
 export const Route = createFileRoute("/")({
   component: Dashboard,
   head: () => ({
     meta: [
-      { title: "TSDR Command & Control · Karimnagar Wildfire Intelligence" },
-      { name: "description", content: "Telangana State Disaster Response tactical dashboard for real-time NASA FIRMS detections, Sentinel-2 burn-scar overlays, and field dispatch across the Karimnagar sector." },
+      { title: "PPF Command & Control · Ludhiana Stubble Fire Intelligence" },
+      { name: "description", content: "Punjab Pollution Control tactical dashboard for real-time NASA FIRMS detections, Sentinel-2 burn-scar overlays, and field dispatch across the Ludhiana sector." },
     ],
   }),
 });
 
 // Nearest known block label for a given lat/lng (rough, dispatch-grade)
-// Test focus blocks — Karimnagar/Telangana sector around 18.15351, 79.5154
 const BLOCKS: { name: string; lat: number; lng: number }[] = [
-  { name: "Karimnagar", lat: 18.4386, lng: 79.1288 },
-  { name: "Huzurabad", lat: 18.1933, lng: 79.4042 },
-  { name: "Jammikunta", lat: 18.2789, lng: 79.4736 },
-  { name: "Husnabad", lat: 18.1351, lng: 79.5154 },
-  { name: "Sircilla", lat: 18.3878, lng: 78.8106 },
-  { name: "Peddapalli", lat: 18.6147, lng: 79.3744 },
-  { name: "Warangal", lat: 17.9784, lng: 79.6004 },
-  { name: "Hanamkonda", lat: 18.0079, lng: 79.5685 },
-  { name: "Siddipet", lat: 18.1018, lng: 78.8520 },
-  { name: "Jagtial", lat: 18.7895, lng: 78.9120 },
-  { name: "Mancherial", lat: 18.8714, lng: 79.4441 },
-  { name: "Nizamabad", lat: 18.6725, lng: 78.0941 },
-  { name: "Hyderabad", lat: 17.3850, lng: 78.4867 },
-  { name: "Khammam", lat: 17.2473, lng: 80.1514 },
+  { name: "Ludhiana", lat: 30.9010, lng: 75.8573 },
+  { name: "Jalandhar", lat: 31.3260, lng: 75.5762 },
+  { name: "Khanna", lat: 30.7040, lng: 76.2176 },
+  { name: "Moga", lat: 30.8160, lng: 75.1720 },
+  { name: "Sangrur", lat: 30.2430, lng: 75.8400 },
+  { name: "Patiala", lat: 30.3398, lng: 76.3869 },
+  { name: "Amritsar", lat: 31.6340, lng: 74.8723 },
+  { name: "Bathinda", lat: 30.2110, lng: 74.9455 },
+  { name: "Ferozepur", lat: 30.9330, lng: 74.6160 },
+  { name: "Barnala", lat: 30.3700, lng: 75.5500 },
+  { name: "Fazilka", lat: 30.4040, lng: 74.0280 },
+  { name: "Hoshiarpur", lat: 31.5200, lng: 75.9800 },
+  { name: "Kapurthala", lat: 31.3800, lng: 75.3800 },
+  { name: "Rupnagar", lat: 30.9700, lng: 76.5300 },
+  { name: "Nawanshahr", lat: 31.1200, lng: 76.1300 },
 ];
 
 function nearestBlock(lat: number, lng: number): string {
@@ -45,6 +47,17 @@ function nearestBlock(lat: number, lng: number): string {
     if (d < bestD) { bestD = d; best = b; }
   }
   return best.name;
+}
+
+function ClientMapView(props: React.ComponentProps<typeof MapView>) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return <div className="panel h-full flex items-center justify-center text-muted-foreground text-sm">Loading map…</div>;
+  return (
+    <Suspense fallback={<div className="panel h-full flex items-center justify-center text-muted-foreground text-sm">Loading map…</div>}>
+      <MapView {...props} />
+    </Suspense>
+  );
 }
 
 function Dashboard() {
@@ -80,7 +93,7 @@ function Dashboard() {
       <main className="mx-auto max-w-[1600px] px-5 py-4 space-y-4">
         <section className="grid gap-4 lg:grid-cols-5">
           <div className="lg:col-span-3 h-[560px]">
-            <MapView fires={fires} live={firesLive} source={firesSource} tiles={tiles} diag={diag} />
+            <ClientMapView fires={fires} live={firesLive} source={firesSource} tiles={tiles} diag={diag} />
           </div>
           <div className="lg:col-span-2 h-[560px]">
             <DispatchFeed fires={fires} live={firesLive} />

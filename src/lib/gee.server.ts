@@ -130,8 +130,8 @@ export async function diagnoseGee(): Promise<GeeDiagnostic> {
 // NASA FIRMS — direct REST (live fire points)
 // ============================================================
 
-// Test focus: Karimnagar / Telangana region around 18.15351, 79.5154
-export const PUNJAB_BBOX = [78.0, 16.5, 81.0, 19.7] as const;
+// Live monitoring focus: Ludhiana / Punjab region
+export const PUNJAB_BBOX = [73.9, 29.5, 76.9, 32.5] as const;
 
 export type FirePoint = {
   id: string;
@@ -171,7 +171,7 @@ function confToNum(c: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-export async function fetchActiveFires(dayRange = 2): Promise<{ fires: FirePoint[]; source: string } | null> {
+export async function fetchActiveFires(dayRange = 1): Promise<{ fires: FirePoint[]; source: string } | null> {
   const key = process.env.FIRMS_MAP_KEY;
   if (!key) return null;
   if (cachedFires && Date.now() - cachedFires.ts < 5 * 60_000) {

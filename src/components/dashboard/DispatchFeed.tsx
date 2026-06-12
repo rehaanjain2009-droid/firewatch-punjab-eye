@@ -33,7 +33,7 @@ export function DispatchFeed({ fires, live }: Props) {
   const unhandled = sorted.filter((f) => !dispatched.has(f.id) && !acked.has(f.id)).length;
 
   const handleCopy = (f: LiveFire) => {
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${f.lat},${f.lng}&travelmode=driving`;
+    const url = `https://www.google.com/maps/search/?api=1&query=${f.lat},${f.lng}`;
     navigator.clipboard?.writeText(url).catch(() => {});
     setCopied(f.id);
     setTimeout(() => setCopied(null), 1600);

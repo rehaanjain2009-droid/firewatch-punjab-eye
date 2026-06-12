@@ -3,20 +3,21 @@ import { fetchActiveFires } from "@/lib/gee.server";
 import { isDispatched, markDispatched, pruneDedup, sendTelegram } from "@/lib/telegram.server";
 
 const BLOCKS: { name: string; lat: number; lng: number }[] = [
-  { name: "Karimnagar", lat: 18.4386, lng: 79.1288 },
-  { name: "Huzurabad", lat: 18.1933, lng: 79.4042 },
-  { name: "Jammikunta", lat: 18.2789, lng: 79.4736 },
-  { name: "Husnabad", lat: 18.1351, lng: 79.5154 },
-  { name: "Sircilla", lat: 18.3878, lng: 78.8106 },
-  { name: "Peddapalli", lat: 18.6147, lng: 79.3744 },
-  { name: "Warangal", lat: 17.9784, lng: 79.6004 },
-  { name: "Hanamkonda", lat: 18.0079, lng: 79.5685 },
-  { name: "Siddipet", lat: 18.1018, lng: 78.8520 },
-  { name: "Jagtial", lat: 18.7895, lng: 78.9120 },
-  { name: "Mancherial", lat: 18.8714, lng: 79.4441 },
-  { name: "Nizamabad", lat: 18.6725, lng: 78.0941 },
-  { name: "Hyderabad", lat: 17.3850, lng: 78.4867 },
-  { name: "Khammam", lat: 17.2473, lng: 80.1514 },
+  { name: "Ludhiana", lat: 30.9010, lng: 75.8573 },
+  { name: "Jalandhar", lat: 31.3260, lng: 75.5762 },
+  { name: "Khanna", lat: 30.7040, lng: 76.2176 },
+  { name: "Moga", lat: 30.8160, lng: 75.1720 },
+  { name: "Sangrur", lat: 30.2430, lng: 75.8400 },
+  { name: "Patiala", lat: 30.3398, lng: 76.3869 },
+  { name: "Amritsar", lat: 31.6340, lng: 74.8723 },
+  { name: "Bathinda", lat: 30.2110, lng: 74.9455 },
+  { name: "Ferozepur", lat: 30.9330, lng: 74.6160 },
+  { name: "Barnala", lat: 30.3700, lng: 75.5500 },
+  { name: "Fazilka", lat: 30.4040, lng: 74.0280 },
+  { name: "Hoshiarpur", lat: 31.5200, lng: 75.9800 },
+  { name: "Kapurthala", lat: 31.3800, lng: 75.3800 },
+  { name: "Rupnagar", lat: 30.9700, lng: 76.5300 },
+  { name: "Nawanshahr", lat: 31.1200, lng: 76.1300 },
 ];
 
 function nearestBlock(lat: number, lng: number): string {
