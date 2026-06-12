@@ -1,12 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { StatusHeader } from "@/components/dashboard/StatusHeader";
-import { MapView, type LiveFire } from "@/components/dashboard/MapView";
+import type { LiveFire } from "@/components/dashboard/MapView";
 import { DispatchFeed } from "@/components/dashboard/DispatchFeed";
 import { HourlyChart } from "@/components/dashboard/HourlyChart";
 import { SystemConsole } from "@/components/dashboard/SystemConsole";
 import { getActiveFires, getGeeStatus, getTileLayers } from "@/lib/gee.functions";
+
+const MapView = lazy(() => import("@/components/dashboard/MapView").then((m) => ({ default: m.MapView })));
 
 export const Route = createFileRoute("/")({
   component: Dashboard,
