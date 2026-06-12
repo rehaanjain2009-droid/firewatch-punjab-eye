@@ -49,6 +49,17 @@ function nearestBlock(lat: number, lng: number): string {
   return best.name;
 }
 
+function ClientMapView(props: React.ComponentProps<typeof MapView>) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return <div className="panel h-full flex items-center justify-center text-muted-foreground text-sm">Loading map…</div>;
+  return (
+    <Suspense fallback={<div className="panel h-full flex items-center justify-center text-muted-foreground text-sm">Loading map…</div>}>
+      <MapView {...props} />
+    </Suspense>
+  );
+}
+
 function Dashboard() {
   const [fires, setFires] = useState<LiveFire[]>([]);
   const [firesLive, setFiresLive] = useState(false);
@@ -75,17 +86,6 @@ function Dashboard() {
     fetchTiles().then((r) => { if (mounted) setTiles(r.layers); }).catch(() => {});
     return () => { mounted = false; };
   }, [fetchFires, fetchStatus, fetchTiles]);
-
-function ClientMapView(props: React.ComponentProps<typeof MapView>) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  if (!mounted) return <div className="panel h-full flex items-center justify-center text-muted-foreground text-sm">Loading map…</div>;
-  return (
-    <Suspense fallback={<div className="panel h-full flex items-center justify-center text-muted-foreground text-sm">Loading map…</div>}>
-      <MapView {...props} />
-    </Suspense>
-  );
-}
 
   return (
     <div className="min-h-screen bg-background text-foreground">
