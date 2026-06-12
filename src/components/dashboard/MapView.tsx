@@ -19,8 +19,8 @@ export type LiveFire = {
 type Diag = null | { ok: boolean; step: string; message: string; httpStatus?: number; httpBody?: string; clientEmail?: string; projectId?: string | null };
 type Tile = { id: "nbr" | "cropland"; label: string; tileUrl: string };
 
-const FOCUS: [number, number] = [18.15351, 79.5154];
-const DEFAULT_ZOOM = 9;
+const FOCUS: [number, number] = [30.901, 75.857];
+const DEFAULT_ZOOM = 10;
 
 const LAYERS = [
   { id: "base", label: "Base Map", icon: MapIcon },
@@ -74,8 +74,8 @@ export function MapView({ fires, live, source, tiles, diag }: Props) {
       <div className="panel-header flex items-center justify-between px-4 py-2.5">
         <div className="flex items-center gap-2">
           <Crosshair className="h-4 w-4 text-primary" />
-          <h2 className="text-sm font-bold tracking-wide">TACTICAL GIS · KARIMNAGAR SECTOR</h2>
-          <span className="text-mono text-[10px] text-muted-foreground">18.15°N · 79.51°E</span>
+          <h2 className="text-sm font-bold tracking-wide">TACTICAL GIS · LUDHIANA SECTOR</h2>
+          <span className="text-mono text-[10px] text-muted-foreground">30.90°N · 75.86°E</span>
         </div>
         <div className="flex items-center gap-3 text-mono text-[10px] text-muted-foreground">
           <span className={`flex items-center gap-1.5 rounded px-1.5 py-0.5 border ${live ? "border-[oklch(0.85_0.18_155)/40] text-[oklch(0.85_0.18_155)]" : "border-muted-foreground/20"}`}>
@@ -184,7 +184,7 @@ export function MapView({ fires, live, source, tiles, diag }: Props) {
 
         {/* Compass */}
         <div className="absolute right-3 bottom-3 panel px-2 py-1.5 text-mono text-[10px] text-muted-foreground z-[1000]">
-          <div className="flex items-center gap-1.5"><Crosshair className="h-3 w-3 text-primary" /> N · 18.15, 79.51 · KARIMNAGAR</div>
+          <div className="flex items-center gap-1.5"><Crosshair className="h-3 w-3 text-primary" /> N · 30.90, 75.86 · LUDHIANA</div>
         </div>
 
         {!live && fires.length === 0 && (
@@ -219,11 +219,11 @@ export function MapView({ fires, live, source, tiles, diag }: Props) {
               <div className="rounded bg-accent/40 px-2 py-1.5"><div className="text-[9px] uppercase tracking-wider text-muted-foreground">Acquired</div><div className="text-foreground">{sel.acqDate} {sel.acqTime}</div></div>
             </div>
             <a
-              href={`https://www.google.com/maps/dir/?api=1&destination=${sel.lat},${sel.lng}&travelmode=driving`}
+              href={`https://www.google.com/maps/search/?api=1&query=${sel.lat},${sel.lng}`}
               target="_blank" rel="noreferrer"
               className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md bg-primary px-2 py-1.5 text-xs font-bold text-primary-foreground transition-opacity hover:opacity-90"
             >
-              <MapPin className="h-3.5 w-3.5" /> Lock target & dispatch
+              <MapPin className="h-3.5 w-3.5" /> Open in Google Maps
             </a>
           </div>
         )}
