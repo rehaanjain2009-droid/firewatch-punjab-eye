@@ -16,7 +16,7 @@ export type LiveFire = {
   block: string;
 };
 
-type Diag = null | { ok: boolean; step: string; message: string; httpStatus?: number; httpBody?: string; clientEmail?: string; projectId?: string | null };
+type Diag = null | { ok: boolean; step: string; message: string; httpStatus?: number };
 type Tile = { id: "nbr" | "cropland"; label: string; tileUrl: string };
 
 const FOCUS: [number, number] = [30.901, 75.857];
