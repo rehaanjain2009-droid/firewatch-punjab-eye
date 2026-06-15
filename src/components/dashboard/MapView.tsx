@@ -96,7 +96,7 @@ export function MapView({ fires, live, source, tiles, diag }: Props) {
             <div className="flex-1 space-y-0.5">
               <div className="font-bold uppercase tracking-wider">GEE AUTH FAIL · step={diag.step}{diag.httpStatus ? ` · HTTP ${diag.httpStatus}` : ""}</div>
               <div className="text-foreground/90">{diag.message}</div>
-              {diag.httpBody && <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap rounded bg-background/60 p-1.5 text-[10px] text-foreground/80">{diag.httpBody}</pre>}
+              
             </div>
           </div>
         </div>
