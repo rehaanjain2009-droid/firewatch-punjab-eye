@@ -72,14 +72,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
+      { title: "STUBBLE WATCHER" },
+      { name: "description", content: "Real-time monitoring dashboard for agricultural stubble fires, featuring GIS mapping and actionable alerts." },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:title", content: "STUBBLE WATCHER" },
+      { property: "og:description", content: "Real-time monitoring dashboard for agricultural stubble fires, featuring GIS mapping and actionable alerts." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "STUBBLE WATCHER" },
+      { name: "twitter:description", content: "Real-time monitoring dashboard for agricultural stubble fires, featuring GIS mapping and actionable alerts." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/86b2aa70-6e24-4c76-b0b0-f646878fd677/id-preview-a9f72b5f--95489fd0-c93e-4275-8154-4296500d92e4.lovable.app-1781522443050.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/86b2aa70-6e24-4c76-b0b0-f646878fd677/id-preview-a9f72b5f--95489fd0-c93e-4275-8154-4296500d92e4.lovable.app-1781522443050.png" },
     ],
     links: [
       {
