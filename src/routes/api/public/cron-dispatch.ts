@@ -48,15 +48,11 @@ export const Route = createFileRoute("/api/public/cron-dispatch")({
 async function handle(request: Request) {
   const url = new URL(request.url);
   const cronSecret = process.env.CRON_SECRET;
-  const anonKey = process.env.SUPABASE_PUBLISHABLE_KEY;
   const provided =
     url.searchParams.get("secret") ??
     request.headers.get("x-cron-secret") ??
-    request.headers.get("apikey") ??
     request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  const ok =
-    (!!cronSecret && provided === cronSecret) ||
-    (!!anonKey && provided === anonKey);
+  const ok = !!cronSecret && !!provided && provided === cronSecret;
   if (!ok) {
     return new Response(JSON.stringify({ ok: false, error: "Unauthorized" }), {
       status: 401,

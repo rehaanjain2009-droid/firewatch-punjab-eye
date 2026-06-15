@@ -1,11 +1,18 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { diagnoseGee, fetchActiveFires, fetchTileLayers, getProjectId } from "./gee.server";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { diagnoseGee, fetchActiveFires, fetchTileLayers } from "./gee.server";
 import { sendTelegram } from "./telegram.server";
 
 export const getGeeStatus = createServerFn({ method: "GET" }).handler(async () => {
   const diag = await diagnoseGee();
-  return { ...diag, projectIdFromEnv: getProjectId() };
+  // Strip sensitive infrastructure details before returning to the browser.
+  return {
+    ok: diag.ok,
+    step: diag.step,
+    message: diag.message,
+    httpStatus: diag.httpStatus,
+  };
 });
 
 export const getActiveFires = createServerFn({ method: "GET" }).handler(async () => {
@@ -31,6 +38,7 @@ const DispatchSchema = z.object({
 });
 
 export const dispatchTelegram = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input) => DispatchSchema.parse(input))
   .handler(async ({ data }) => {
     const result = await sendTelegram(data);
