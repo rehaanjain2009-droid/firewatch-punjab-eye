@@ -1,52 +1,53 @@
-## Goal
+## Six fixes + Auth/Telegram onboarding
 
-Swap the synthetic SVG map for a real live interactive map centered on the Karimnagar / Telangana focus area, with NASA FIRMS pulsing markers and the Earth Engine tile overlays (Sentinel-2 NBR + ESA WorldCover Cropland) drawn as actual map tiles. Update branding, sector labels, and the StatusHeader so the UI matches the new satellite focus instead of saying "Punjab · Ludhiana Sector".
+### 1. Map popup ✕
+`MapView.tsx` — drop the `fires[0]` fallback so the popup only renders when `selected` is non-null; ✕ calls `setSelected(null)`.
 
-## Map library
+### 2. Auto-fit bounds
+Add a `FitToFires` child using `useMap()`. 0 fires → recenter Ludhiana z10; 1 → `setView` z12; 2+ → `fitBounds(L.latLngBounds(coords), { padding:[50,50], maxZoom:12 })`. Marker-pick `flyTo` preserved.
 
-Use **Leaflet + react-leaflet** with OpenStreetMap basemap. Reasons:
-- GEE `getMapId` returns standard XYZ tile URLs — drops straight into Leaflet's `TileLayer`.
-- No API key, no referrer restriction, no `mapId` config — works on every Lovable preview.
-- Lightweight; fits the dark tactical aesthetic with a dark tile theme (CartoDB Dark Matter).
-- Free pan/zoom, real geographic projection — current SVG hard-codes a bbox and can't pan.
+### 3. Lock Base Map
+Remove the `"base"` entry from the layer toggle list. CARTO dark `<TileLayer>` always renders. Toggle panel exposes only FIRMS / NBR / Cropland / Radar.
 
-Google Maps JS is the alternative but adds a connector dependency and a heavier API for raster overlays. Leaflet is the right tool here.
+### 4. Per-fire GMaps link
+`DispatchFeed.tsx` — build URL inside `.map(item => …)` as `https://www.google.com/maps/search/?api=1&query=${item.lat.toFixed(6)},${item.lng.toFixed(6)}` with `Number.isFinite` guard.
 
-## Changes
+### 5. Honest satellite layers
+- FIRMS: live toggle.
+- Sentinel-2 NBR & ESA Cropland: toggle when their tile URL is present in `tiles` prop; otherwise rendered disabled with a `BACKEND REQ` badge.
+- Radar: always disabled with `COMING SOON` badge.
 
-### 1. Add dependencies
-- `leaflet`, `react-leaflet`, `@types/leaflet`
+### 6. Auth + Telegram onboarding
 
-### 2. Rewrite `src/components/dashboard/MapView.tsx`
-- Replace the SVG canvas with `<MapContainer center={[18.15351, 79.5154]} zoom={9}>`.
-- Basemap: CartoDB Dark Matter XYZ tiles (matches the dashboard theme).
-- Add `<TileLayer>` for each GEE layer (`nbr`, `cropland`) using their live `tileUrl`, controlled by the existing layer toggle. Cropland gets ~0.5 opacity, NBR ~0.7.
-- Render FIRMS fire points as `<CircleMarker>` with the same severity color ramp and a CSS pulse ring. Click → opens the existing hotspot popup panel.
-- Keep the existing UI chrome (layer toggle, GEE-tiles-live pill, hotspot detail card, FIRMS status pill, GEE auth-fail banner) overlaid on top of the map via absolute positioning.
-- Drop the fake rivers/roads SVG and the hardcoded city labels (the real basemap shows them).
-- Update the header title to "TACTICAL GIS · KARIMNAGAR SECTOR" and the coordinate readout to `18.15°N · 79.51°E`.
+**Migration** — `public.profiles`:
+- `user_id uuid PK references auth.users on delete cascade`, `email`, `telegram_handle`, `telegram_chat_id`, `created_at`, `updated_at`
+- `GRANT SELECT,INSERT,UPDATE … TO authenticated; GRANT ALL TO service_role;`
+- RLS on; user can SELECT/INSERT/UPDATE own row
+- Trigger on `auth.users` insert → seeds profile with email
+- `update_updated_at_column` trigger
 
-### 3. Update `src/components/dashboard/StatusHeader.tsx`
-- Subtitle: "Telangana State Disaster Response · Stubble & Wildfire Intelligence Grid · Karimnagar Sector".
-- Station code: `KNR-CMD-01`.
-- Keep operator/clock layout unchanged.
+**Providers** — `configure_social_auth(['google'])`; keep email/password.
 
-### 4. CSS
-- Import `leaflet/dist/leaflet.css` once (in MapView or `src/styles.css`).
-- Add a small `.leaflet-container { background: oklch(0.20 0.025 252); }` rule so the map blends with the panel while tiles load.
-- Keep the existing `pulse-ring` keyframes for fire markers.
+**Routes** (integration-managed `_authenticated/route.tsx` already gates):
+- `src/routes/auth.tsx` (`ssr:false`) — Sign-in / Sign-up tabs (email+password) + "Continue with Google" via `lovable.auth.signInWithOAuth('google', { redirect_uri: window.location.origin })`.
+- Move dashboard from `src/routes/index.tsx` → `src/routes/_authenticated/index.tsx`. Loader calls `getMyProfile`; if `telegram_handle` is null → `redirect('/onboarding')`.
+- `src/routes/_authenticated/onboarding.tsx` — handle input (regex `^@?[A-Za-z0-9_]{5,32}$`), clickable "Join Telegram Dispatch Group" link from `import.meta.env.VITE_TELEGRAM_INVITE_URL` (placeholder + warning when unset), Save → `upsertTelegramHandle` → navigate `/`.
+- `src/routes/index.tsx` becomes a small redirect (signed-in → `/`, else `/auth`).
 
-## Out of scope
+**Server fns** — `src/lib/profile.functions.ts`:
+- `getMyProfile` (uses `requireSupabaseAuth`)
+- `upsertTelegramHandle({ handle })` — Zod-validated upsert
 
-- No backend changes — FIRMS bbox, FIRMS day range, GEE tile URLs, dispatch logic, cron, and Telegram all stay as-is.
-- No new dependencies beyond Leaflet.
-- The `BLOCKS` city list (already updated to Telangana) stays as the nearest-city lookup for the Dispatch Feed labels.
+**Header** — `StatusHeader.tsx`: email pill + sign-out (`cancelQueries → clear → supabase.auth.signOut → navigate('/auth')`).
 
-## Verification
+Telegram dispatch keeps using the existing shared `TELEGRAM_CHAT_ID`. The invite link in onboarding is how new operators join that group. Per-user DM fan-out is out of scope here.
 
-After build:
-1. Map renders centered on Karimnagar with dark basemap and visible road/town labels.
-2. FIRMS markers pulse at real geographic coordinates around 18.15, 79.51.
-3. Toggling "Sentinel-2 NBR" and "ESA Cropland" in the layer panel shows/hides the GEE raster overlays on the map.
-4. Clicking a fire point opens the hotspot detail card with lat/lng, confidence, FRP, and the "Lock target & dispatch" Google Maps link.
-5. Header reads "Karimnagar Sector" — no more Punjab/Ludhiana references in the UI.
+### Files
+- edit: `MapView.tsx`, `DispatchFeed.tsx`, `StatusHeader.tsx`, `routes/index.tsx`
+- new: `routes/auth.tsx`, `routes/_authenticated/index.tsx`, `routes/_authenticated/onboarding.tsx`, `lib/profile.functions.ts`, migration
+- tools: `configure_social_auth(['google'])`
+
+### After approval
+1. Run the profiles migration.
+2. Enable Google sign-in.
+3. Share the Telegram group invite URL when ready; I'll set `VITE_TELEGRAM_INVITE_URL`. Until then onboarding shows a clear placeholder.
