@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, CircleMarker, useMap } from "react-leaflet";
-import { Layers, Map as MapIcon, Flame, Satellite, Sprout, Crosshair, MapPin, X, AlertTriangle, Radio } from "lucide-react";
+import L from "leaflet";
+import { Layers, Flame, Satellite, Sprout, Crosshair, MapPin, X, AlertTriangle, Radio, Radar } from "lucide-react";
 
 export type LiveFire = {
   id: string;
@@ -22,15 +23,6 @@ type Tile = { id: "nbr" | "cropland"; label: string; tileUrl: string };
 const FOCUS: [number, number] = [30.901, 75.857];
 const DEFAULT_ZOOM = 10;
 
-const LAYERS = [
-  { id: "base", label: "Base Map", icon: MapIcon },
-  { id: "firms", label: "FIRMS Thermal", icon: Flame },
-  { id: "nbr", label: "Sentinel-2 NBR", icon: Satellite },
-  { id: "cropland", label: "ESA Cropland", icon: Sprout },
-] as const;
-
-type LayerId = typeof LAYERS[number]["id"];
-
 const sevColor = (c: number) => c >= 80 ? "oklch(0.65 0.24 25)" : c >= 60 ? "oklch(0.82 0.17 80)" : "oklch(0.78 0.18 155)";
 const sevHex = (c: number) => c >= 80 ? "#e8473a" : c >= 60 ? "#f0b400" : "#22c08a";
 const sevLevel = (c: number): "high" | "med" | "low" => c >= 80 ? "high" : c >= 60 ? "med" : "low";
@@ -45,24 +37,76 @@ type Props = {
 
 function Recenter({ target }: { target: LiveFire | null }) {
   const map = useMap();
-  if (target) map.flyTo([target.lat, target.lng], 11, { duration: 0.8 });
+  useEffect(() => {
+    if (target) map.flyTo([target.lat, target.lng], 12, { duration: 0.8 });
+  }, [target, map]);
   return null;
 }
 
+function FitToFires({ fires }: { fires: LiveFire[] }) {
+  const map = useMap();
+  useEffect(() => {
+    const pts = fires
+      .filter((f) => Number.isFinite(f.lat) && Number.isFinite(f.lng))
+      .map((f) => [f.lat, f.lng] as [number, number]);
+    if (pts.length === 0) {
+      map.setView(FOCUS, DEFAULT_ZOOM, { animate: true });
+      return;
+    }
+    if (pts.length === 1) {
+      map.setView(pts[0], 12, { animate: true });
+      return;
+    }
+    const bounds = L.latLngBounds(pts);
+    map.fitBounds(bounds, { padding: [50, 50], maxZoom: 12, animate: true });
+  }, [fires, map]);
+  return null;
+}
+
+type OverlayId = "firms" | "nbr" | "cropland" | "radar";
+type OverlayDef = {
+  id: OverlayId;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  available: boolean;
+  badge?: "LIVE" | "BACKEND REQ" | "COMING SOON";
+};
+
 export function MapView({ fires, live, source, tiles, diag }: Props) {
-  const [active, setActive] = useState<Set<LayerId>>(new Set(["base", "firms", "cropland", "nbr"]));
+  const nbrTile = tiles.find((t) => t.id === "nbr");
+  const cropTile = tiles.find((t) => t.id === "cropland");
+
+  const overlays: OverlayDef[] = [
+    { id: "firms", label: "FIRMS Thermal", icon: Flame, available: true, badge: live ? "LIVE" : undefined },
+    { id: "nbr", label: "Sentinel-2 NBR", icon: Satellite, available: !!nbrTile, badge: nbrTile ? "LIVE" : "BACKEND REQ" },
+    { id: "cropland", label: "ESA Cropland", icon: Sprout, available: !!cropTile, badge: cropTile ? "LIVE" : "BACKEND REQ" },
+    { id: "radar", label: "Sentinel-1 Radar", icon: Radar, available: false, badge: "COMING SOON" },
+  ];
+
+  const initial = new Set<OverlayId>(["firms"]);
+  if (nbrTile) initial.add("nbr");
+  if (cropTile) initial.add("cropland");
+  const [active, setActive] = useState<Set<OverlayId>>(initial);
   const [selected, setSelected] = useState<LiveFire | null>(null);
   const [flyTarget, setFlyTarget] = useState<LiveFire | null>(null);
 
-  const toggle = (id: LayerId) => {
-    const next = new Set(active);
-    next.has(id) ? next.delete(id) : next.add(id);
-    setActive(next);
-  };
+  useEffect(() => {
+    setActive((prev) => {
+      const next = new Set(prev);
+      if (nbrTile) next.add("nbr"); else next.delete("nbr");
+      if (cropTile) next.add("cropland"); else next.delete("cropland");
+      return next;
+    });
+  }, [nbrTile, cropTile]);
 
-  const nbrTile = tiles.find((t) => t.id === "nbr");
-  const cropTile = tiles.find((t) => t.id === "cropland");
-  const sel = selected ?? fires[0] ?? null;
+  const toggle = (id: OverlayId, available: boolean) => {
+    if (!available) return;
+    setActive((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
 
   const handlePick = (f: LiveFire) => {
     setSelected(f);
@@ -96,7 +140,6 @@ export function MapView({ fires, live, source, tiles, diag }: Props) {
             <div className="flex-1 space-y-0.5">
               <div className="font-bold uppercase tracking-wider">GEE AUTH FAIL · step={diag.step}{diag.httpStatus ? ` · HTTP ${diag.httpStatus}` : ""}</div>
               <div className="text-foreground/90">{diag.message}</div>
-              
             </div>
           </div>
         </div>
@@ -111,14 +154,13 @@ export function MapView({ fires, live, source, tiles, diag }: Props) {
           attributionControl
           worldCopyJump
         >
-          {active.has("base") && (
-            <TileLayer
-              attribution='&copy; OpenStreetMap &copy; CARTO'
-              url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-              subdomains={["a", "b", "c", "d"]}
-              maxZoom={19}
-            />
-          )}
+          {/* Base map — always rendered, cannot be toggled off */}
+          <TileLayer
+            attribution='&copy; OpenStreetMap &copy; CARTO'
+            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+            subdomains={["a", "b", "c", "d"]}
+            maxZoom={19}
+          />
           {active.has("cropland") && cropTile && (
             <TileLayer url={cropTile.tileUrl} opacity={0.45} maxZoom={19} />
           )}
@@ -128,7 +170,7 @@ export function MapView({ fires, live, source, tiles, diag }: Props) {
 
           {active.has("firms") && fires.map((f) => {
             const c = sevHex(f.confidence);
-            const isSel = sel?.id === f.id;
+            const isSel = selected?.id === f.id;
             return (
               <CircleMarker
                 key={f.id}
@@ -146,6 +188,7 @@ export function MapView({ fires, live, source, tiles, diag }: Props) {
             );
           })}
 
+          <FitToFires fires={fires} />
           <Recenter target={flyTarget} />
         </MapContainer>
 
@@ -154,18 +197,32 @@ export function MapView({ fires, live, source, tiles, diag }: Props) {
           <div className="mb-1.5 flex items-center gap-1.5 px-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             <Layers className="h-3 w-3" /> Layers
           </div>
+          <div className="mb-1 flex items-center gap-2 rounded-md border border-border bg-accent/30 px-2 py-1.5 text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">Base Map</span>
+            <span className="ml-auto text-[8px] tracking-wider text-[oklch(0.85_0.18_155)]">LOCKED</span>
+          </div>
           <div className="flex flex-col gap-1">
-            {LAYERS.map((l) => {
+            {overlays.map((l) => {
               const on = active.has(l.id);
               const Icon = l.icon;
-              const liveTag = l.id === "firms" ? live : l.id === "nbr" ? !!nbrTile : l.id === "cropland" ? !!cropTile : true;
+              const badgeColor = l.badge === "LIVE" ? "text-[oklch(0.85_0.18_155)]" : l.badge === "BACKEND REQ" ? "text-[oklch(0.88_0.17_80)]" : "text-muted-foreground";
               return (
-                <button key={l.id} onClick={() => toggle(l.id)}
-                  className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors ${on ? "bg-primary/15 text-primary border border-primary/40" : "border border-transparent text-muted-foreground hover:bg-accent/50 hover:text-foreground"}`}>
+                <button
+                  key={l.id}
+                  onClick={() => toggle(l.id, l.available)}
+                  disabled={!l.available}
+                  className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors ${
+                    !l.available
+                      ? "border border-dashed border-border text-muted-foreground/60 cursor-not-allowed opacity-70"
+                      : on
+                        ? "bg-primary/15 text-primary border border-primary/40"
+                        : "border border-transparent text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                  }`}
+                >
                   <Icon className="h-3.5 w-3.5" />
                   <span className="font-medium">{l.label}</span>
-                  {liveTag && <span className="text-[8px] text-[oklch(0.85_0.18_155)] tracking-wider">LIVE</span>}
-                  <span className={`ml-auto h-1.5 w-1.5 rounded-full ${on ? "bg-primary shadow-[0_0_8px_currentColor]" : "bg-muted"}`} />
+                  {l.badge && <span className={`text-[8px] tracking-wider ${badgeColor}`}>{l.badge}</span>}
+                  <span className={`ml-auto h-1.5 w-1.5 rounded-full ${on && l.available ? "bg-primary shadow-[0_0_8px_currentColor]" : "bg-muted"}`} />
                 </button>
               );
             })}
@@ -196,30 +253,35 @@ export function MapView({ fires, live, source, tiles, diag }: Props) {
         )}
 
         {/* Hotspot popup */}
-        {sel && (
+        {selected && (
           <div className="absolute right-3 top-3 panel w-72 p-3 z-[1000]">
             <div className="flex items-start justify-between">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full" style={{ background: sevColor(sel.confidence), boxShadow: `0 0 8px ${sevColor(sel.confidence)}` }} />
-                  <span className="text-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{sel.id}</span>
+                  <span className="h-2 w-2 rounded-full" style={{ background: sevColor(selected.confidence), boxShadow: `0 0 8px ${sevColor(selected.confidence)}` }} />
+                  <span className="text-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{selected.id}</span>
                 </div>
-                <div className="mt-0.5 text-sm font-bold text-foreground">{sel.block} <span className="text-muted-foreground font-normal">· {sel.satellite}</span></div>
+                <div className="mt-0.5 text-sm font-bold text-foreground">{selected.block} <span className="text-muted-foreground font-normal">· {selected.satellite}</span></div>
               </div>
-              <button onClick={() => { setSelected(null); setFlyTarget(null); }} className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground">
+              <button
+                type="button"
+                onClick={() => { setSelected(null); setFlyTarget(null); }}
+                aria-label="Close popup"
+                className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>
             <div className="mt-2 grid grid-cols-2 gap-2 text-mono text-[11px]">
-              <div className="rounded bg-accent/40 px-2 py-1.5"><div className="text-[9px] uppercase tracking-wider text-muted-foreground">Latitude</div><div className="text-foreground">{sel.lat.toFixed(4)}°N</div></div>
-              <div className="rounded bg-accent/40 px-2 py-1.5"><div className="text-[9px] uppercase tracking-wider text-muted-foreground">Longitude</div><div className="text-foreground">{sel.lng.toFixed(4)}°E</div></div>
-              <div className="rounded bg-accent/40 px-2 py-1.5"><div className="text-[9px] uppercase tracking-wider text-muted-foreground">Confidence</div><div className="text-foreground">{sel.confidence}% · {sevLevel(sel.confidence).toUpperCase()}</div></div>
-              <div className="rounded bg-accent/40 px-2 py-1.5"><div className="text-[9px] uppercase tracking-wider text-muted-foreground">Brightness</div><div className="text-foreground">{sel.brightness.toFixed(1)}K</div></div>
-              <div className="rounded bg-accent/40 px-2 py-1.5"><div className="text-[9px] uppercase tracking-wider text-muted-foreground">FRP</div><div className="text-foreground">{sel.frp.toFixed(1)} MW</div></div>
-              <div className="rounded bg-accent/40 px-2 py-1.5"><div className="text-[9px] uppercase tracking-wider text-muted-foreground">Acquired</div><div className="text-foreground">{sel.acqDate} {sel.acqTime}</div></div>
+              <div className="rounded bg-accent/40 px-2 py-1.5"><div className="text-[9px] uppercase tracking-wider text-muted-foreground">Latitude</div><div className="text-foreground">{selected.lat.toFixed(4)}°N</div></div>
+              <div className="rounded bg-accent/40 px-2 py-1.5"><div className="text-[9px] uppercase tracking-wider text-muted-foreground">Longitude</div><div className="text-foreground">{selected.lng.toFixed(4)}°E</div></div>
+              <div className="rounded bg-accent/40 px-2 py-1.5"><div className="text-[9px] uppercase tracking-wider text-muted-foreground">Confidence</div><div className="text-foreground">{selected.confidence}% · {sevLevel(selected.confidence).toUpperCase()}</div></div>
+              <div className="rounded bg-accent/40 px-2 py-1.5"><div className="text-[9px] uppercase tracking-wider text-muted-foreground">Brightness</div><div className="text-foreground">{selected.brightness.toFixed(1)}K</div></div>
+              <div className="rounded bg-accent/40 px-2 py-1.5"><div className="text-[9px] uppercase tracking-wider text-muted-foreground">FRP</div><div className="text-foreground">{selected.frp.toFixed(1)} MW</div></div>
+              <div className="rounded bg-accent/40 px-2 py-1.5"><div className="text-[9px] uppercase tracking-wider text-muted-foreground">Acquired</div><div className="text-foreground">{selected.acqDate} {selected.acqTime}</div></div>
             </div>
             <a
-              href={`https://www.google.com/maps/search/?api=1&query=${sel.lat},${sel.lng}`}
+              href={`https://www.google.com/maps/search/?api=1&query=${selected.lat.toFixed(6)},${selected.lng.toFixed(6)}`}
               target="_blank" rel="noreferrer"
               className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md bg-primary px-2 py-1.5 text-xs font-bold text-primary-foreground transition-opacity hover:opacity-90"
             >
