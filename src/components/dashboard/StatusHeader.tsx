@@ -1,4 +1,8 @@
-import { Activity, Satellite, Radar, Cog, ShieldAlert, Filter, Truck, Radio } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
+import { Activity, Satellite, Radar, Cog, ShieldAlert, Filter, Truck, Radio, LogOut, User } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 function Pill({ tone, children }: { tone: "emerald" | "amber" | "slate" | "crimson"; children: React.ReactNode }) {
   const map = {
@@ -60,7 +64,33 @@ function Counter({ icon: Icon, label, value, tone, sub }: { icon: React.Componen
   );
 }
 
-export function StatusHeader() {
+type Props = { email?: string | null; telegramHandle?: string | null };
+
+export function StatusHeader({ email, telegramHandle }: Props = {}) {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const i = setInterval(() => {
+      const el = document.getElementById("utc-clock");
+      if (el) el.textContent = new Date().toLocaleTimeString("en-IN", { hour12: false }) + " IST";
+    }, 1000);
+    return () => clearInterval(i);
+  }, []);
+
+  const signOut = async () => {
+    setBusy(true);
+    try {
+      await queryClient.cancelQueries();
+      queryClient.clear();
+      await supabase.auth.signOut();
+      navigate({ to: "/auth", replace: true });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <header className="border-b border-border bg-panel/60 backdrop-blur-md">
       <div className="mx-auto max-w-[1600px] px-5 py-3">
@@ -79,13 +109,22 @@ export function StatusHeader() {
               </p>
             </div>
           </div>
-          <div className="hidden md:flex items-center gap-3 text-mono text-[11px] text-muted-foreground">
-            <Radio className="h-3.5 w-3.5 text-primary" />
-            <span>OPERATOR: <span className="text-foreground">INSP. H. SINGH</span></span>
-            <span className="opacity-40">|</span>
-            <span>STATION: <span className="text-foreground">LDH-CMD-01</span></span>
-            <span className="opacity-40">|</span>
-            <span className="text-foreground" id="utc-clock">--:--:-- IST</span>
+          <div className="flex items-center gap-3 text-mono text-[11px] text-muted-foreground">
+            <Radio className="h-3.5 w-3.5 text-primary hidden md:block" />
+            {email && (
+              <span className="hidden md:inline-flex items-center gap-1.5 rounded border border-border bg-accent/40 px-2 py-1 text-foreground">
+                <User className="h-3 w-3" /> {email}
+                {telegramHandle && <span className="text-muted-foreground">· @{telegramHandle}</span>}
+              </span>
+            )}
+            <span className="hidden lg:inline text-foreground" id="utc-clock">--:--:-- IST</span>
+            <button
+              onClick={signOut}
+              disabled={busy}
+              className="inline-flex items-center gap-1.5 rounded border border-border bg-accent/40 px-2 py-1 font-semibold uppercase tracking-wider text-foreground hover:border-primary/40 hover:bg-accent disabled:opacity-60"
+            >
+              <LogOut className="h-3 w-3" /> Sign out
+            </button>
           </div>
         </div>
 

@@ -1,5 +1,5 @@
 import { useEffect, useState, lazy, Suspense } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { StatusHeader } from "@/components/dashboard/StatusHeader";
 import type { LiveFire } from "@/components/dashboard/MapView";
@@ -7,10 +7,18 @@ import { DispatchFeed } from "@/components/dashboard/DispatchFeed";
 import { HourlyChart } from "@/components/dashboard/HourlyChart";
 import { SystemConsole } from "@/components/dashboard/SystemConsole";
 import { getActiveFires, getGeeStatus, getTileLayers } from "@/lib/gee.functions";
+import { getMyProfile } from "@/lib/profile.functions";
 
 const MapView = lazy(() => import("@/components/dashboard/MapView").then((m) => ({ default: m.MapView })));
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/_authenticated/")({
+  loader: async () => {
+    const profile = await getMyProfile();
+    if (!profile?.telegram_handle) {
+      throw redirect({ to: "/onboarding" });
+    }
+    return { profile };
+  },
   component: Dashboard,
   head: () => ({
     meta: [
@@ -20,7 +28,6 @@ export const Route = createFileRoute("/")({
   }),
 });
 
-// Nearest known block label for a given lat/lng (rough, dispatch-grade)
 const BLOCKS: { name: string; lat: number; lng: number }[] = [
   { name: "Ludhiana", lat: 30.9010, lng: 75.8573 },
   { name: "Jalandhar", lat: 31.3260, lng: 75.5762 },
@@ -61,6 +68,7 @@ function ClientMapView(props: React.ComponentProps<typeof MapView>) {
 }
 
 function Dashboard() {
+  const { profile } = Route.useLoaderData();
   const [fires, setFires] = useState<LiveFire[]>([]);
   const [firesLive, setFiresLive] = useState(false);
   const [firesSource, setFiresSource] = useState<string>("");
@@ -75,10 +83,9 @@ function Dashboard() {
     fetchStatus().then((s) => { if (mounted) setDiag(s); }).catch(() => {});
     fetchFires().then((r) => {
       if (!mounted) return;
-      const enriched: LiveFire[] = r.fires.map((f) => ({
-        ...f,
-        block: nearestBlock(f.lat, f.lng),
-      }));
+      const enriched: LiveFire[] = r.fires
+        .filter((f) => Number.isFinite(f.lat) && Number.isFinite(f.lng))
+        .map((f) => ({ ...f, block: nearestBlock(f.lat, f.lng) }));
       setFires(enriched);
       setFiresLive(r.live);
       setFiresSource(r.source);
@@ -89,7 +96,7 @@ function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <StatusHeader />
+      <StatusHeader email={profile?.email ?? null} telegramHandle={profile?.telegram_handle ?? null} />
       <main className="mx-auto max-w-[1600px] px-5 py-4 space-y-4">
         <section className="grid gap-4 lg:grid-cols-5">
           <div className="lg:col-span-3 h-[560px]">
