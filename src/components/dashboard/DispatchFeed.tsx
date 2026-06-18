@@ -32,8 +32,14 @@ export function DispatchFeed({ fires, live }: Props) {
   const sorted = useMemo(() => [...fires].sort((a, b) => b.confidence - a.confidence), [fires]);
   const unhandled = sorted.filter((f) => !dispatched.has(f.id) && !acked.has(f.id)).length;
 
+  const gmapsUrl = (f: LiveFire): string | null => {
+    if (!Number.isFinite(f.lat) || !Number.isFinite(f.lng)) return null;
+    return `https://www.google.com/maps/search/?api=1&query=${f.lat.toFixed(6)},${f.lng.toFixed(6)}`;
+  };
+
   const handleCopy = (f: LiveFire) => {
-    const url = `https://www.google.com/maps/search/?api=1&query=${f.lat},${f.lng}`;
+    const url = gmapsUrl(f);
+    if (!url) return;
     navigator.clipboard?.writeText(url).catch(() => {});
     setCopied(f.id);
     setTimeout(() => setCopied(null), 1600);
