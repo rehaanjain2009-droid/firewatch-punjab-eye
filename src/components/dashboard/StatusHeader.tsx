@@ -64,9 +64,9 @@ function Counter({ icon: Icon, label, value, tone, sub }: { icon: React.Componen
   );
 }
 
-type Props = { email?: string | null; telegramHandle?: string | null };
+type Props = { email?: string | null; telegramHandle?: string | null; dispatchCount?: number };
 
-export function StatusHeader({ email, telegramHandle }: Props = {}) {
+export function StatusHeader({ email, telegramHandle, dispatchCount = 0 }: Props = {}) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
