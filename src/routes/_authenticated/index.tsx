@@ -70,6 +70,7 @@ function ClientMapView(props: React.ComponentProps<typeof MapView>) {
 function Dashboard() {
   const { profile } = Route.useLoaderData();
   const [fires, setFires] = useState<LiveFire[]>([]);
+  const [dispatchCount, setDispatchCount] = useState(0);
   const [firesLive, setFiresLive] = useState(false);
   const [firesSource, setFiresSource] = useState<string>("");
   const fetchFires = useServerFn(getActiveFires);
