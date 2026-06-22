@@ -138,7 +138,7 @@ export function StatusHeader({ email, telegramHandle, dispatchCount = 0 }: Props
           <div className="lg:col-span-3 grid grid-cols-3 gap-2">
             <Counter icon={ShieldAlert} label="Active Alerts Today" value="27" tone="crimson" sub="+6 last hour" />
             <Counter icon={Filter} label="False+ Suppressed" value="184" tone="amber" sub="ESA Cropland mask" />
-            <Counter icon={Truck} label="Patrol Units Dispatched" value="12" tone="emerald" sub="9 en route · 3 on-site" />
+            <Counter icon={Truck} label="Alerts Dispatched" value={String(dispatchCount)} tone="emerald" sub="Session dispatches" />
           </div>
         </div>
       </div>
