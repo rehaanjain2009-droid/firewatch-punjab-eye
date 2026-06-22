@@ -1,53 +1,34 @@
-## Six fixes + Auth/Telegram onboarding
+## Three mock-free fixes
 
-### 1. Map popup ✕
-`MapView.tsx` — drop the `fires[0]` fallback so the popup only renders when `selected` is non-null; ✕ calls `setSelected(null)`.
+### 1. Per-fire GMaps URL (`DispatchFeed.tsx`)
+Switch URL format to the one specified: `https://www.google.com/maps?q=${f.lat},${f.lng}` (still guarded by `Number.isFinite`, still built inside the `.map(f => …)` closure so each card uses its own coords). Drop `.toFixed(6)` so the link matches the coords shown in the row text.
 
-### 2. Auto-fit bounds
-Add a `FitToFires` child using `useMap()`. 0 fires → recenter Ludhiana z10; 1 → `setView` z12; 2+ → `fitBounds(L.latLngBounds(coords), { padding:[50,50], maxZoom:12 })`. Marker-pick `flyTo` preserved.
+### 2. "Alerts Dispatched" counter (real, session-scoped)
+Lift dispatch state to the dashboard so the header and feed stay in sync.
 
-### 3. Lock Base Map
-Remove the `"base"` entry from the layer toggle list. CARTO dark `<TileLayer>` always renders. Toggle panel exposes only FIRMS / NBR / Cropland / Radar.
+- `routes/_authenticated/index.tsx` — add `const [dispatchCount, setDispatchCount] = useState(0)`; pass `dispatchCount` to `StatusHeader` and `onDispatched={() => setDispatchCount(c => c + 1)}` to `DispatchFeed`.
+- `DispatchFeed.tsx` — accept `onDispatched?: () => void`; call it inside `handleDispatch` only on the success branch (when `r.ok` and the id wasn't already in `dispatched`).
+- `StatusHeader.tsx` — accept `dispatchCount?: number`; rename the third `Counter` to **"Alerts Dispatched"**, value `String(dispatchCount ?? 0)`, sub `"Session dispatches"`. Remove the hard-coded `12` / `9 en route · 3 on-site`.
 
-### 4. Per-fire GMaps link
-`DispatchFeed.tsx` — build URL inside `.map(item => …)` as `https://www.google.com/maps/search/?api=1&query=${item.lat.toFixed(6)},${item.lng.toFixed(6)}` with `Number.isFinite` guard.
+Other counters in the header are out of scope for this turn (user only flagged this card).
 
-### 5. Honest satellite layers
-- FIRMS: live toggle.
-- Sentinel-2 NBR & ESA Cropland: toggle when their tile URL is present in `tiles` prop; otherwise rendered disabled with a `BACKEND REQ` badge.
-- Radar: always disabled with `COMING SOON` badge.
+### 3. Real "Ignitions by Hour" chart (`HourlyChart.tsx`)
+Make the chart a pure function of the live FIRMS fires.
 
-### 6. Auth + Telegram onboarding
+- Change signature to `HourlyChart({ fires }: { fires: LiveFire[] })`. Dashboard already has `fires`; pass it through.
+- Delete the hard-coded `DATA` constant and the `142` / `118` / `2,847` callout cards.
+- Inside the component, `useMemo` to build a 24-bucket array from `fires`:
+  - Parse `acq_time` ("HHMM", zero-padded to 4 chars) → `hour = Number(padded.slice(0,2))`. Skip rows where the parse isn't a finite `0–23`.
+  - Bucket counts per hour, render `[{ hour, label: "HH:00", count }]` into the existing `<BarChart>`.
+  - `barColor` keyed off the actual computed max (e.g. red for the top bucket, amber for ≥50% of max, emerald otherwise) — no hard-coded hour highlights.
+- Replace the right-hand callout column with one real tile: label `"Plotted ignitions"`, value = `fires.length` (or sum of buckets), sub `"From live NASA FIRMS acq_time"`. If `fires.length === 0`, render an empty-state message instead of bars ("Awaiting FIRMS uplink — no ignitions to plot").
 
-**Migration** — `public.profiles`:
-- `user_id uuid PK references auth.users on delete cascade`, `email`, `telegram_handle`, `telegram_chat_id`, `created_at`, `updated_at`
-- `GRANT SELECT,INSERT,UPDATE … TO authenticated; GRANT ALL TO service_role;`
-- RLS on; user can SELECT/INSERT/UPDATE own row
-- Trigger on `auth.users` insert → seeds profile with email
-- `update_updated_at_column` trigger
+If at implementation time `acq_time` turns out to be missing/unparseable on the live payload, the fallback per the user's rule is to delete the `<HourlyChart />` section from `routes/_authenticated/index.tsx` entirely rather than show mock bars. The current `LiveFire` type exposes `acqTime` as a string, so this fallback is not expected to trigger.
 
-**Providers** — `configure_social_auth(['google'])`; keep email/password.
+### Files touched
+- edit: `src/components/dashboard/DispatchFeed.tsx`
+- edit: `src/components/dashboard/StatusHeader.tsx`
+- edit: `src/components/dashboard/HourlyChart.tsx`
+- edit: `src/routes/_authenticated/index.tsx`
 
-**Routes** (integration-managed `_authenticated/route.tsx` already gates):
-- `src/routes/auth.tsx` (`ssr:false`) — Sign-in / Sign-up tabs (email+password) + "Continue with Google" via `lovable.auth.signInWithOAuth('google', { redirect_uri: window.location.origin })`.
-- Move dashboard from `src/routes/index.tsx` → `src/routes/_authenticated/index.tsx`. Loader calls `getMyProfile`; if `telegram_handle` is null → `redirect('/onboarding')`.
-- `src/routes/_authenticated/onboarding.tsx` — handle input (regex `^@?[A-Za-z0-9_]{5,32}$`), clickable "Join Telegram Dispatch Group" link from `import.meta.env.VITE_TELEGRAM_INVITE_URL` (placeholder + warning when unset), Save → `upsertTelegramHandle` → navigate `/`.
-- `src/routes/index.tsx` becomes a small redirect (signed-in → `/`, else `/auth`).
-
-**Server fns** — `src/lib/profile.functions.ts`:
-- `getMyProfile` (uses `requireSupabaseAuth`)
-- `upsertTelegramHandle({ handle })` — Zod-validated upsert
-
-**Header** — `StatusHeader.tsx`: email pill + sign-out (`cancelQueries → clear → supabase.auth.signOut → navigate('/auth')`).
-
-Telegram dispatch keeps using the existing shared `TELEGRAM_CHAT_ID`. The invite link in onboarding is how new operators join that group. Per-user DM fan-out is out of scope here.
-
-### Files
-- edit: `MapView.tsx`, `DispatchFeed.tsx`, `StatusHeader.tsx`, `routes/index.tsx`
-- new: `routes/auth.tsx`, `routes/_authenticated/index.tsx`, `routes/_authenticated/onboarding.tsx`, `lib/profile.functions.ts`, migration
-- tools: `configure_social_auth(['google'])`
-
-### After approval
-1. Run the profiles migration.
-2. Enable Google sign-in.
-3. Share the Telegram group invite URL when ready; I'll set `VITE_TELEGRAM_INVITE_URL`. Until then onboarding shows a clear placeholder.
+No backend, schema, or routing changes.

@@ -64,9 +64,9 @@ function Counter({ icon: Icon, label, value, tone, sub }: { icon: React.Componen
   );
 }
 
-type Props = { email?: string | null; telegramHandle?: string | null };
+type Props = { email?: string | null; telegramHandle?: string | null; dispatchCount?: number };
 
-export function StatusHeader({ email, telegramHandle }: Props = {}) {
+export function StatusHeader({ email, telegramHandle, dispatchCount = 0 }: Props = {}) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
@@ -138,7 +138,7 @@ export function StatusHeader({ email, telegramHandle }: Props = {}) {
           <div className="lg:col-span-3 grid grid-cols-3 gap-2">
             <Counter icon={ShieldAlert} label="Active Alerts Today" value="27" tone="crimson" sub="+6 last hour" />
             <Counter icon={Filter} label="False+ Suppressed" value="184" tone="amber" sub="ESA Cropland mask" />
-            <Counter icon={Truck} label="Patrol Units Dispatched" value="12" tone="emerald" sub="9 en route · 3 on-site" />
+            <Counter icon={Truck} label="Alerts Dispatched" value={String(dispatchCount)} tone="emerald" sub="Session dispatches" />
           </div>
         </div>
       </div>

@@ -70,6 +70,7 @@ function ClientMapView(props: React.ComponentProps<typeof MapView>) {
 function Dashboard() {
   const { profile } = Route.useLoaderData();
   const [fires, setFires] = useState<LiveFire[]>([]);
+  const [dispatchCount, setDispatchCount] = useState(0);
   const [firesLive, setFiresLive] = useState(false);
   const [firesSource, setFiresSource] = useState<string>("");
   const fetchFires = useServerFn(getActiveFires);
@@ -96,19 +97,19 @@ function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <StatusHeader email={profile?.email ?? null} telegramHandle={profile?.telegram_handle ?? null} />
+      <StatusHeader email={profile?.email ?? null} telegramHandle={profile?.telegram_handle ?? null} dispatchCount={dispatchCount} />
       <main className="mx-auto max-w-[1600px] px-5 py-4 space-y-4">
         <section className="grid gap-4 lg:grid-cols-5">
           <div className="lg:col-span-3 h-[560px]">
             <ClientMapView fires={fires} live={firesLive} source={firesSource} tiles={tiles} diag={diag} />
           </div>
           <div className="lg:col-span-2 h-[560px]">
-            <DispatchFeed fires={fires} live={firesLive} />
+            <DispatchFeed fires={fires} live={firesLive} onDispatched={() => setDispatchCount((c) => c + 1)} />
           </div>
         </section>
 
         <section className="h-[340px]">
-          <HourlyChart />
+          <HourlyChart fires={fires} />
         </section>
 
         <section className="h-[280px] pb-4">

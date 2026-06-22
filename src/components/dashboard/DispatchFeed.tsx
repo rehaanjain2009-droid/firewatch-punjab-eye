@@ -19,9 +19,9 @@ function evasionTag(acqTime: string): "evening" | "midnight" | null {
   return null;
 }
 
-type Props = { fires: LiveFire[]; live: boolean };
+type Props = { fires: LiveFire[]; live: boolean; onDispatched?: () => void };
 
-export function DispatchFeed({ fires, live }: Props) {
+export function DispatchFeed({ fires, live, onDispatched }: Props) {
   const [copied, setCopied] = useState<string | null>(null);
   const [dispatched, setDispatched] = useState<Set<string>>(new Set());
   const [sending, setSending] = useState<Set<string>>(new Set());
@@ -34,7 +34,7 @@ export function DispatchFeed({ fires, live }: Props) {
 
   const gmapsUrl = (f: LiveFire): string | null => {
     if (!Number.isFinite(f.lat) || !Number.isFinite(f.lng)) return null;
-    return `https://www.google.com/maps/search/?api=1&query=${f.lat.toFixed(6)},${f.lng.toFixed(6)}`;
+    return `https://www.google.com/maps?q=${f.lat},${f.lng}`;
   };
 
   const handleCopy = (f: LiveFire) => {
@@ -63,7 +63,12 @@ export function DispatchFeed({ fires, live }: Props) {
         },
       });
       if (r.ok) {
-        setDispatched((s) => new Set(s).add(f.id));
+        setDispatched((s) => {
+          if (s.has(f.id)) return s;
+          const n = new Set(s).add(f.id);
+          onDispatched?.();
+          return n;
+        });
       } else {
         setErrors((e) => ({ ...e, [f.id]: `HTTP ${r.status}: ${r.body.slice(0, 80)}` }));
       }
