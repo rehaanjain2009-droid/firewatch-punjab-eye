@@ -97,7 +97,7 @@ function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <StatusHeader email={profile?.email ?? null} telegramHandle={profile?.telegram_handle ?? null} dispatchCount={dispatchCount} />
+      <StatusHeader email={profile?.email ?? null} telegramHandle={profile?.telegram_handle ?? null} dispatchCount={dispatchCount} fires={fires} firmsLive={firesLive} />
       <main className="mx-auto max-w-[1600px] px-5 py-4 space-y-4">
         <section className="grid gap-4 lg:grid-cols-5">
           <div className="lg:col-span-3 h-[560px]">

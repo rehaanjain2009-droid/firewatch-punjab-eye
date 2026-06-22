@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { Activity, Satellite, Radar, Cog, ShieldAlert, Filter, Truck, Radio, LogOut, User } from "lucide-react";
+import { Activity, Flame, Zap, ShieldCheck, Truck, ShieldAlert, Radio, LogOut, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import type { LiveFire } from "@/components/dashboard/MapView";
 
 function Pill({ tone, children }: { tone: "emerald" | "amber" | "slate" | "crimson"; children: React.ReactNode }) {
   const map = {
@@ -15,31 +16,6 @@ function Pill({ tone, children }: { tone: "emerald" | "amber" | "slate" | "crims
     <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${map[tone]}`}>
       {children}
     </span>
-  );
-}
-
-function SystemTile({
-  icon: Icon, label, value, tone,
-}: { icon: React.ComponentType<{ className?: string }>; label: string; value: React.ReactNode; tone: "emerald" | "amber" | "slate" | "crimson" }) {
-  const dotMap = {
-    emerald: "bg-[oklch(0.78_0.18_155)] shadow-[0_0_12px_oklch(0.78_0.18_155/0.8)]",
-    amber: "bg-[oklch(0.82_0.17_80)] shadow-[0_0_12px_oklch(0.82_0.17_80/0.8)]",
-    slate: "bg-muted-foreground",
-    crimson: "bg-[oklch(0.65_0.24_25)] shadow-[0_0_12px_oklch(0.65_0.24_25/0.8)]",
-  };
-  return (
-    <div className="panel flex items-center gap-3 px-3 py-2.5">
-      <div className="flex h-9 w-9 items-center justify-center rounded-md bg-accent/60 border border-border">
-        <Icon className="h-4 w-4 text-foreground/80" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className={`h-1.5 w-1.5 rounded-full ${dotMap[tone]} ${tone !== "slate" ? "ticker" : ""}`} />
-          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{label}</span>
-        </div>
-        <div className="text-mono text-sm font-semibold text-foreground truncate">{value}</div>
-      </div>
-    </div>
   );
 }
 
@@ -64,12 +40,23 @@ function Counter({ icon: Icon, label, value, tone, sub }: { icon: React.Componen
   );
 }
 
-type Props = { email?: string | null; telegramHandle?: string | null; dispatchCount?: number };
+type Props = { email?: string | null; telegramHandle?: string | null; dispatchCount?: number; fires?: LiveFire[]; firmsLive?: boolean };
 
-export function StatusHeader({ email, telegramHandle, dispatchCount = 0 }: Props = {}) {
+export function StatusHeader({ email, telegramHandle, dispatchCount = 0, fires = [], firmsLive = false }: Props = {}) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
+
+  const { total, peakFrp, highConfidence } = useMemo(() => {
+    const total = fires.length;
+    let peak = 0;
+    let high = 0;
+    for (const f of fires) {
+      if (Number.isFinite(f.frp) && f.frp > peak) peak = f.frp;
+      if (Number.isFinite(f.confidence) && f.confidence >= 80) high += 1;
+    }
+    return { total, peakFrp: peak, highConfidence: high };
+  }, [fires]);
 
   useEffect(() => {
     const i = setInterval(() => {
@@ -90,6 +77,8 @@ export function StatusHeader({ email, telegramHandle, dispatchCount = 0 }: Props
       setBusy(false);
     }
   };
+
+  const peakValue = total === 0 ? "— MW" : `${peakFrp.toFixed(1)} MW`;
 
   return (
     <header className="border-b border-border bg-panel/60 backdrop-blur-md">
@@ -128,18 +117,12 @@ export function StatusHeader({ email, telegramHandle, dispatchCount = 0 }: Props
           </div>
         </div>
 
-        <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-7">
-          <div className="lg:col-span-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
-            <SystemTile icon={Activity} label="Thermal · FIRMS" value="LIVE 24/7" tone="emerald" />
-            <SystemTile icon={Satellite} label="Optical · Sentinel-2" value="Pass 11:30 AM" tone="amber" />
-            <SystemTile icon={Radar} label="Radar · Sentinel-1" value="STANDBY" tone="slate" />
-            <SystemTile icon={Cog} label="Automation · CRON" value="ACTIVE" tone="emerald" />
-          </div>
-          <div className="lg:col-span-3 grid grid-cols-3 gap-2">
-            <Counter icon={ShieldAlert} label="Active Alerts Today" value="27" tone="crimson" sub="+6 last hour" />
-            <Counter icon={Filter} label="False+ Suppressed" value="184" tone="amber" sub="ESA Cropland mask" />
-            <Counter icon={Truck} label="Alerts Dispatched" value={String(dispatchCount)} tone="emerald" sub="Session dispatches" />
-          </div>
+        <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-5">
+          <Counter icon={Activity} label="Thermal · FIRMS" value={firmsLive ? "LIVE" : "OFFLINE"} tone={firmsLive ? "emerald" : "amber"} sub="NASA FIRMS uplink" />
+          <Counter icon={Flame} label="Total Thermal Anomalies" value={String(total)} tone="crimson" sub="Active FIRMS detections" />
+          <Counter icon={Zap} label="Peak Intensity · Max FRP" value={peakValue} tone="amber" sub="Fire Radiative Power" />
+          <Counter icon={ShieldCheck} label="High Confidence Detections" value={String(highConfidence)} tone="crimson" sub="Confidence ≥ 80%" />
+          <Counter icon={Truck} label="Alerts Dispatched" value={String(dispatchCount)} tone="emerald" sub="Session dispatches" />
         </div>
       </div>
     </header>
