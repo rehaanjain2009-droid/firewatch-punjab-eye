@@ -70,6 +70,8 @@ export function DispatchFeed({ fires, live, onDispatched }: Props) {
           return n;
         });
       } else {
+        setErrors((e) => ({ ...e, [f.id]: `HTTP ${r.status}: ${r.body.slice(0, 80)}` }));
+      }
     } catch (err) {
       setErrors((e) => ({ ...e, [f.id]: (err as Error).message }));
     } finally {
