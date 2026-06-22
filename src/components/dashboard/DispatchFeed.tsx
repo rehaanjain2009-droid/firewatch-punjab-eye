@@ -34,7 +34,7 @@ export function DispatchFeed({ fires, live }: Props) {
 
   const gmapsUrl = (f: LiveFire): string | null => {
     if (!Number.isFinite(f.lat) || !Number.isFinite(f.lng)) return null;
-    return `https://www.google.com/maps/search/?api=1&query=${f.lat.toFixed(6)},${f.lng.toFixed(6)}`;
+    return `https://www.google.com/maps?q=${f.lat},${f.lng}`;
   };
 
   const handleCopy = (f: LiveFire) => {
