@@ -19,9 +19,9 @@ function evasionTag(acqTime: string): "evening" | "midnight" | null {
   return null;
 }
 
-type Props = { fires: LiveFire[]; live: boolean };
+type Props = { fires: LiveFire[]; live: boolean; onDispatched?: () => void };
 
-export function DispatchFeed({ fires, live }: Props) {
+export function DispatchFeed({ fires, live, onDispatched }: Props) {
   const [copied, setCopied] = useState<string | null>(null);
   const [dispatched, setDispatched] = useState<Set<string>>(new Set());
   const [sending, setSending] = useState<Set<string>>(new Set());
