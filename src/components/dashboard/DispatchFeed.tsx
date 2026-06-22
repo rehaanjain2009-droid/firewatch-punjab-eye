@@ -63,10 +63,13 @@ export function DispatchFeed({ fires, live, onDispatched }: Props) {
         },
       });
       if (r.ok) {
-        setDispatched((s) => new Set(s).add(f.id));
+        setDispatched((s) => {
+          if (s.has(f.id)) return s;
+          const n = new Set(s).add(f.id);
+          onDispatched?.();
+          return n;
+        });
       } else {
-        setErrors((e) => ({ ...e, [f.id]: `HTTP ${r.status}: ${r.body.slice(0, 80)}` }));
-      }
     } catch (err) {
       setErrors((e) => ({ ...e, [f.id]: (err as Error).message }));
     } finally {
