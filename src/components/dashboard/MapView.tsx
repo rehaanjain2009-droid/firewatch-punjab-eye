@@ -68,28 +68,31 @@ function FitToFires({ fires }: { fires: LiveFire[] }) {
 }
 
 type OverlayId = "firms" | "nbr" | "cropland" | "radar";
+type OverlayBadge = "LIVE" | "MASK LIVE" | "CLASSIFYING…" | "MASK OFFLINE" | "BACKEND REQ" | "COMING SOON";
 type OverlayDef = {
   id: OverlayId;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   available: boolean;
-  badge?: "LIVE" | "BACKEND REQ" | "COMING SOON";
+  badge?: OverlayBadge;
 };
 
-export function MapView({ fires, live, source, tiles, diag }: Props) {
+export function MapView({ fires, live, source, tiles, diag, maskStatus = "offline", onCroplandToggle }: Props) {
   const nbrTile = tiles.find((t) => t.id === "nbr");
   const cropTile = tiles.find((t) => t.id === "cropland");
+
+  const cropBadge: OverlayBadge =
+    maskStatus === "live" ? "MASK LIVE" : maskStatus === "loading" ? "CLASSIFYING…" : "MASK OFFLINE";
 
   const overlays: OverlayDef[] = [
     { id: "firms", label: "FIRMS Thermal", icon: Flame, available: true, badge: live ? "LIVE" : undefined },
     { id: "nbr", label: "Sentinel-2 NBR", icon: Satellite, available: !!nbrTile, badge: nbrTile ? "LIVE" : "BACKEND REQ" },
-    { id: "cropland", label: "ESA Cropland", icon: Sprout, available: !!cropTile, badge: cropTile ? "LIVE" : "BACKEND REQ" },
+    { id: "cropland", label: "ESA Cropland", icon: Sprout, available: true, badge: cropBadge },
     { id: "radar", label: "Sentinel-1 Radar", icon: Radar, available: false, badge: "COMING SOON" },
   ];
 
-  const initial = new Set<OverlayId>(["firms"]);
+  const initial = new Set<OverlayId>(["firms", "cropland"]);
   if (nbrTile) initial.add("nbr");
-  if (cropTile) initial.add("cropland");
   const [active, setActive] = useState<Set<OverlayId>>(initial);
   const [selected, setSelected] = useState<LiveFire | null>(null);
   const [flyTarget, setFlyTarget] = useState<LiveFire | null>(null);
@@ -98,16 +101,17 @@ export function MapView({ fires, live, source, tiles, diag }: Props) {
     setActive((prev) => {
       const next = new Set(prev);
       if (nbrTile) next.add("nbr"); else next.delete("nbr");
-      if (cropTile) next.add("cropland"); else next.delete("cropland");
       return next;
     });
-  }, [nbrTile, cropTile]);
+  }, [nbrTile]);
 
   const toggle = (id: OverlayId, available: boolean) => {
     if (!available) return;
     setActive((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      const willBeActive = !next.has(id);
+      if (willBeActive) next.add(id); else next.delete(id);
+      if (id === "cropland") onCroplandToggle?.(willBeActive);
       return next;
     });
   };
