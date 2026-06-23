@@ -27,12 +27,16 @@ const sevColor = (c: number) => c >= 80 ? "oklch(0.65 0.24 25)" : c >= 60 ? "okl
 const sevHex = (c: number) => c >= 80 ? "#e8473a" : c >= 60 ? "#f0b400" : "#22c08a";
 const sevLevel = (c: number): "high" | "med" | "low" => c >= 80 ? "high" : c >= 60 ? "med" : "low";
 
+type MaskStatus = "live" | "loading" | "offline";
+
 type Props = {
   fires: LiveFire[];
   live: boolean;
   source: string;
   tiles: Tile[];
   diag: Diag;
+  maskStatus?: MaskStatus;
+  onCroplandToggle?: (active: boolean) => void;
 };
 
 function Recenter({ target }: { target: LiveFire | null }) {
