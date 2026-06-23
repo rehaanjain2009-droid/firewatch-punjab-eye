@@ -117,12 +117,14 @@ export function StatusHeader({ email, telegramHandle, dispatchCount = 0, fires =
           </div>
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-5">
+        <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6">
           <Counter icon={Activity} label="Thermal · FIRMS" value={firmsLive ? "LIVE" : "OFFLINE"} tone={firmsLive ? "emerald" : "amber"} sub="NASA FIRMS uplink" />
           <Counter icon={Flame} label="Total Thermal Anomalies" value={String(total)} tone="crimson" sub="Active FIRMS detections" />
           <Counter icon={Zap} label="Peak Intensity · Max FRP" value={peakValue} tone="amber" sub="Fire Radiative Power" />
           <Counter icon={ShieldCheck} label="High Confidence Detections" value={String(highConfidence)} tone="crimson" sub="Confidence ≥ 80%" />
+          <Counter icon={ShieldAlert} label="False+ Suppressed" value={maskReady ? String(suppressedCount) : "—"} tone="amber" sub="Outside ESA cropland mask" />
           <Counter icon={Truck} label="Alerts Dispatched" value={String(dispatchCount)} tone="emerald" sub="Session dispatches" />
+
         </div>
       </div>
     </header>
