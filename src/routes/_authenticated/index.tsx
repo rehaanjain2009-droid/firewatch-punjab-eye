@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense } from "react";
+import { useEffect, useState, lazy, Suspense, useMemo } from "react";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { StatusHeader } from "@/components/dashboard/StatusHeader";
@@ -8,6 +8,7 @@ import { HourlyChart } from "@/components/dashboard/HourlyChart";
 import { SystemConsole } from "@/components/dashboard/SystemConsole";
 import { getActiveFires, getGeeStatus, getTileLayers } from "@/lib/gee.functions";
 import { getMyProfile } from "@/lib/profile.functions";
+import { useCroplandMask } from "@/hooks/useCroplandMask";
 
 const MapView = lazy(() => import("@/components/dashboard/MapView").then((m) => ({ default: m.MapView })));
 
@@ -73,6 +74,7 @@ function Dashboard() {
   const [dispatchCount, setDispatchCount] = useState(0);
   const [firesLive, setFiresLive] = useState(false);
   const [firesSource, setFiresSource] = useState<string>("");
+  const [maskEnabled, setMaskEnabled] = useState(true);
   const fetchFires = useServerFn(getActiveFires);
   const fetchStatus = useServerFn(getGeeStatus);
   const fetchTiles = useServerFn(getTileLayers);
@@ -95,21 +97,51 @@ function Dashboard() {
     return () => { mounted = false; };
   }, [fetchFires, fetchStatus, fetchTiles]);
 
+  const mask = useCroplandMask(fires);
+  const visibleFires = useMemo(
+    () => (maskEnabled && mask.ready && mask.ok ? fires.filter((f) => mask.croplandIds.has(f.id)) : fires),
+    [fires, mask, maskEnabled],
+  );
+  const maskStatus: "live" | "loading" | "offline" = !maskEnabled
+    ? "offline"
+    : mask.loading
+      ? "loading"
+      : mask.ready && mask.ok
+        ? "live"
+        : "offline";
+  const suppressedCount = maskEnabled && mask.ready && mask.ok ? mask.suppressedIds.size : 0;
+
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <StatusHeader email={profile?.email ?? null} telegramHandle={profile?.telegram_handle ?? null} dispatchCount={dispatchCount} fires={fires} firmsLive={firesLive} />
+      <StatusHeader
+        email={profile?.email ?? null}
+        telegramHandle={profile?.telegram_handle ?? null}
+        dispatchCount={dispatchCount}
+        fires={visibleFires}
+        firmsLive={firesLive}
+        suppressedCount={suppressedCount}
+        maskReady={maskEnabled && mask.ready && mask.ok}
+      />
       <main className="mx-auto max-w-[1600px] px-5 py-4 space-y-4">
         <section className="grid gap-4 lg:grid-cols-5">
           <div className="lg:col-span-3 h-[560px]">
-            <ClientMapView fires={fires} live={firesLive} source={firesSource} tiles={tiles} diag={diag} />
+            <ClientMapView
+              fires={visibleFires}
+              live={firesLive}
+              source={firesSource}
+              tiles={tiles}
+              diag={diag}
+              maskStatus={maskStatus}
+              onCroplandToggle={setMaskEnabled}
+            />
           </div>
           <div className="lg:col-span-2 h-[560px]">
-            <DispatchFeed fires={fires} live={firesLive} onDispatched={() => setDispatchCount((c) => c + 1)} />
+            <DispatchFeed fires={visibleFires} live={firesLive} onDispatched={() => setDispatchCount((c) => c + 1)} />
           </div>
         </section>
 
         <section className="h-[340px]">
-          <HourlyChart fires={fires} />
+          <HourlyChart fires={visibleFires} />
         </section>
 
         <section className="h-[280px] pb-4">

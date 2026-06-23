@@ -27,12 +27,16 @@ const sevColor = (c: number) => c >= 80 ? "oklch(0.65 0.24 25)" : c >= 60 ? "okl
 const sevHex = (c: number) => c >= 80 ? "#e8473a" : c >= 60 ? "#f0b400" : "#22c08a";
 const sevLevel = (c: number): "high" | "med" | "low" => c >= 80 ? "high" : c >= 60 ? "med" : "low";
 
+type MaskStatus = "live" | "loading" | "offline";
+
 type Props = {
   fires: LiveFire[];
   live: boolean;
   source: string;
   tiles: Tile[];
   diag: Diag;
+  maskStatus?: MaskStatus;
+  onCroplandToggle?: (active: boolean) => void;
 };
 
 function Recenter({ target }: { target: LiveFire | null }) {
@@ -64,28 +68,31 @@ function FitToFires({ fires }: { fires: LiveFire[] }) {
 }
 
 type OverlayId = "firms" | "nbr" | "cropland" | "radar";
+type OverlayBadge = "LIVE" | "MASK LIVE" | "CLASSIFYING…" | "MASK OFFLINE" | "BACKEND REQ" | "COMING SOON";
 type OverlayDef = {
   id: OverlayId;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   available: boolean;
-  badge?: "LIVE" | "BACKEND REQ" | "COMING SOON";
+  badge?: OverlayBadge;
 };
 
-export function MapView({ fires, live, source, tiles, diag }: Props) {
+export function MapView({ fires, live, source, tiles, diag, maskStatus = "offline", onCroplandToggle }: Props) {
   const nbrTile = tiles.find((t) => t.id === "nbr");
   const cropTile = tiles.find((t) => t.id === "cropland");
+
+  const cropBadge: OverlayBadge =
+    maskStatus === "live" ? "MASK LIVE" : maskStatus === "loading" ? "CLASSIFYING…" : "MASK OFFLINE";
 
   const overlays: OverlayDef[] = [
     { id: "firms", label: "FIRMS Thermal", icon: Flame, available: true, badge: live ? "LIVE" : undefined },
     { id: "nbr", label: "Sentinel-2 NBR", icon: Satellite, available: !!nbrTile, badge: nbrTile ? "LIVE" : "BACKEND REQ" },
-    { id: "cropland", label: "ESA Cropland", icon: Sprout, available: !!cropTile, badge: cropTile ? "LIVE" : "BACKEND REQ" },
+    { id: "cropland", label: "ESA Cropland", icon: Sprout, available: true, badge: cropBadge },
     { id: "radar", label: "Sentinel-1 Radar", icon: Radar, available: false, badge: "COMING SOON" },
   ];
 
-  const initial = new Set<OverlayId>(["firms"]);
+  const initial = new Set<OverlayId>(["firms", "cropland"]);
   if (nbrTile) initial.add("nbr");
-  if (cropTile) initial.add("cropland");
   const [active, setActive] = useState<Set<OverlayId>>(initial);
   const [selected, setSelected] = useState<LiveFire | null>(null);
   const [flyTarget, setFlyTarget] = useState<LiveFire | null>(null);
@@ -94,16 +101,17 @@ export function MapView({ fires, live, source, tiles, diag }: Props) {
     setActive((prev) => {
       const next = new Set(prev);
       if (nbrTile) next.add("nbr"); else next.delete("nbr");
-      if (cropTile) next.add("cropland"); else next.delete("cropland");
       return next;
     });
-  }, [nbrTile, cropTile]);
+  }, [nbrTile]);
 
   const toggle = (id: OverlayId, available: boolean) => {
     if (!available) return;
     setActive((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      const willBeActive = !next.has(id);
+      if (willBeActive) next.add(id); else next.delete(id);
+      if (id === "cropland") onCroplandToggle?.(willBeActive);
       return next;
     });
   };
@@ -205,7 +213,14 @@ export function MapView({ fires, live, source, tiles, diag }: Props) {
             {overlays.map((l) => {
               const on = active.has(l.id);
               const Icon = l.icon;
-              const badgeColor = l.badge === "LIVE" ? "text-[oklch(0.85_0.18_155)]" : l.badge === "BACKEND REQ" ? "text-[oklch(0.88_0.17_80)]" : "text-muted-foreground";
+              const badgeColor =
+                l.badge === "LIVE" || l.badge === "MASK LIVE"
+                  ? "text-[oklch(0.85_0.18_155)]"
+                  : l.badge === "BACKEND REQ" || l.badge === "CLASSIFYING…"
+                    ? "text-[oklch(0.88_0.17_80)]"
+                    : l.badge === "MASK OFFLINE"
+                      ? "text-[oklch(0.78_0.22_25)]"
+                      : "text-muted-foreground";
               return (
                 <button
                   key={l.id}
