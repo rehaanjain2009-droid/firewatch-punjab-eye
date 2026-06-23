@@ -1,35 +1,46 @@
-## Replace fake KPI cards with real FIRMS metrics
+## Real ESA Cropland Mask — architecture
 
-### Goal
-Remove all hardcoded KPI text from the top row of the dashboard and replace it with metrics computed directly from the live NASA FIRMS `fires` array.
+The existing GEE backend already authenticates and serves the ESA WorldCover v200 tile layer (cropland = class 40). To actually *filter* fires (not just paint a tile), we need to know each fire's land-cover class. ESA WorldCover is a 10 m raster — there is no public REST endpoint that returns "class at lat/lng" without an auth'd query, and there is no compact GeoJSON of Punjab cropland that would be honest to ship. So the real implementation is: **sample WorldCover at each fire point through GEE on the server**, cache the result, and use that classification on the client to suppress non-cropland fires. Turf.js is added for the secondary urban-exclusion polygon check.
 
-### Changes
+### 1. Dependency
+- `bun add @turf/turf`
 
-#### 1. `src/components/dashboard/StatusHeader.tsx`
-- Add a `fires: LiveFire[]` prop.
-- Compute three real metrics with `useMemo`:
-  - **Total Thermal Anomalies**: `fires.length`
-  - **Peak Intensity (Max FRP)**: `Math.max(...fires.map(f => f.frp), 0)` formatted as e.g. `"14.2 MW"`
-  - **High Confidence Detections**: `fires.filter(f => f.confidence >= 80).length` (the server already normalizes VIIRS `"h"` to `90` and MODIS numeric values are preserved)
-- Remove these fake cards:
-  - `Optical · Sentinel-2`
-  - `Radar · Sentinel-1`
-  - `Automation · CRON`
-  - `False+ Suppressed`
-  - `Active Alerts Today` (also hardcoded to `27`)
-- Keep:
-  - `Thermal · FIRMS` as a live-source status tile
-  - `Alerts Dispatched` counter we fixed earlier
-- Add three new real metric cards alongside the kept cards.
-- Restructure the top grid to a single responsive row (e.g. 5 columns on large screens) so the remaining cards fit cleanly.
-- Empty-state rule: when `fires.length === 0`, show `0`, `— MW`, and `0` instead of invented values.
+### 2. New server function — `src/lib/cropland.functions.ts`
+- `classifyFires({ points: [{id, lat, lng}, ...] })` (createServerFn, POST, Zod-validated, capped at 200 points/call).
+- Handler builds one GEE `value:compute` call using `ee.Image('ESA/WorldCover/v200/2021').reduceRegions` over a `FeatureCollection` of fire points (1 px buffer), returns `{ id, landCover }` for each.
+- LRU-cache results in module scope keyed by `lat.toFixed(4)|lng.toFixed(4)` for 24 h (WorldCover is static).
+- On GEE failure: return `{ classifications: [], ok: false, reason }` — client falls back to passing fires through unfiltered and the suppressed counter shows `—`. No fake numbers.
+- Helper `isCropland(code)` exported: WorldCover crop class is `40`; we also treat `30` (grassland) as **non-cropland** so urban+industrial+water+built (50/80/etc.) are correctly suppressed.
 
-#### 2. `src/routes/_authenticated/index.tsx`
-- Pass the live `fires` array into `<StatusHeader fires={fires} ... />`.
+### 3. Client hook — `src/hooks/useCroplandMask.ts`
+- Input: `LiveFire[]`.
+- Calls `classifyFires` via `useServerFn` + `useQuery`, keyed by sorted fire ids.
+- Returns `{ croplandIds: Set<string>, suppressedIds: Set<string>, ready: boolean, ok: boolean }`.
+- Secondary Turf check: a small hard-coded `ludhianaUrbanPolygon` GeoJSON (rough multipolygon of the Ludhiana municipal core) — any point inside it is forced into `suppressedIds` regardless of WorldCover (catches mixed-pixel edge cases on city boundary). Uses `booleanPointInPolygon` from `@turf/turf`.
+
+### 4. Dashboard wiring — `src/routes/_authenticated/index.tsx`
+- Compute `mask = useCroplandMask(fires)` once.
+- Derive `visibleFires = mask.ready ? fires.filter(f => mask.croplandIds.has(f.id)) : fires`.
+- Pass `visibleFires` (not `fires`) to `MapView`, `DispatchFeed`, `HourlyChart`.
+- Pass `suppressedCount = mask.suppressedIds.size` and `maskReady = mask.ready && mask.ok` to `StatusHeader`.
+
+### 5. `MapView.tsx` — ESA Cropland layer status
+- Remove the `BACKEND REQ` fallback for the `cropland` entry. The badge now reflects mask state:
+  - `mask.ready && mask.ok` → green `MASK LIVE`
+  - in-flight → amber `CLASSIFYING…`
+  - error → red `MASK OFFLINE`
+- Toggling the layer off in the UI keeps the cropland tile hidden **and** disables suppression (so the user can see raw FIRMS for QA). Wire a new prop `onCroplandToggle(active: boolean)` so the parent can switch between `fires` and `visibleFires`.
+
+### 6. `StatusHeader.tsx` — restore False+ Suppressed
+- Add `suppressedCount?: number` and `maskReady?: boolean` props.
+- Add a 6th counter card "False+ Suppressed" (crimson tone, `ShieldAlert` icon, sub "Outside ESA cropland mask"). Grid becomes `lg:grid-cols-6`.
+- Display rule: `maskReady ? String(suppressedCount) : "—"` — never invent a number when classification hasn't completed.
+
+### 7. What stays out of scope
+- No new tables, no auth changes, no migrations.
+- Existing ESA WorldCover **tile overlay** stays as-is; this plan only adds point-sampling on top of it.
+- Cron / dispatch endpoints unchanged.
 
 ### Files touched
-- `src/components/dashboard/StatusHeader.tsx`
-- `src/routes/_authenticated/index.tsx`
-
-### Not in scope
-No backend, database, routing, or auth changes.
+- new: `src/lib/cropland.functions.ts`, `src/lib/cropland.server.ts`, `src/hooks/useCroplandMask.ts`
+- edited: `src/components/dashboard/MapView.tsx`, `src/components/dashboard/StatusHeader.tsx`, `src/routes/_authenticated/index.tsx`, `package.json` (via `bun add`)
