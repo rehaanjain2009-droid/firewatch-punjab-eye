@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense } from "react";
+import { useEffect, useState, lazy, Suspense, useMemo } from "react";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { StatusHeader } from "@/components/dashboard/StatusHeader";
@@ -8,6 +8,7 @@ import { HourlyChart } from "@/components/dashboard/HourlyChart";
 import { SystemConsole } from "@/components/dashboard/SystemConsole";
 import { getActiveFires, getGeeStatus, getTileLayers } from "@/lib/gee.functions";
 import { getMyProfile } from "@/lib/profile.functions";
+import { useCroplandMask } from "@/hooks/useCroplandMask";
 
 const MapView = lazy(() => import("@/components/dashboard/MapView").then((m) => ({ default: m.MapView })));
 
