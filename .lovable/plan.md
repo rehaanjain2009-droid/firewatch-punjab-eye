@@ -1,46 +1,52 @@
-## Real ESA Cropland Mask — architecture
+# Fix: Cropland mask wiping the map
 
-The existing GEE backend already authenticates and serves the ESA WorldCover v200 tile layer (cropland = class 40). To actually *filter* fires (not just paint a tile), we need to know each fire's land-cover class. ESA WorldCover is a 10 m raster — there is no public REST endpoint that returns "class at lat/lng" without an auth'd query, and there is no compact GeoJSON of Punjab cropland that would be honest to ship. So the real implementation is: **sample WorldCover at each fire point through GEE on the server**, cache the result, and use that classification on the client to suppress non-cropland fires. Turf.js is added for the secondary urban-exclusion polygon check.
+## Root cause
 
-### 1. Dependency
-- `bun add @turf/turf`
+In `src/hooks/useCroplandMask.ts` the rule is *"suppress unless explicitly cropland (WorldCover = 40) AND not in urban polygon"*. Any fire whose GEE point sample returns `null`, times out, or is classified as anything other than `40` (trees, shrub, grassland, bare, etc.) is dropped. With the current FIRMS payload most points land on mixed or non-cropland pixels and the map goes blank.
 
-### 2. New server function — `src/lib/cropland.functions.ts`
-- `classifyFires({ points: [{id, lat, lng}, ...] })` (createServerFn, POST, Zod-validated, capped at 200 points/call).
-- Handler builds one GEE `value:compute` call using `ee.Image('ESA/WorldCover/v200/2021').reduceRegions` over a `FeatureCollection` of fire points (1 px buffer), returns `{ id, landCover }` for each.
-- LRU-cache results in module scope keyed by `lat.toFixed(4)|lng.toFixed(4)` for 24 h (WorldCover is static).
-- On GEE failure: return `{ classifications: [], ok: false, reason }` — client falls back to passing fires through unfiltered and the suppressed counter shows `—`. No fake numbers.
-- Helper `isCropland(code)` exported: WorldCover crop class is `40`; we also treat `30` (grassland) as **non-cropland** so urban+industrial+water+built (50/80/etc.) are correctly suppressed.
+Coordinate order in the existing code (`point([lng, lat])`) is actually correct, but we'll harden it and log it per the user's request.
 
-### 3. Client hook — `src/hooks/useCroplandMask.ts`
-- Input: `LiveFire[]`.
-- Calls `classifyFires` via `useServerFn` + `useQuery`, keyed by sorted fire ids.
-- Returns `{ croplandIds: Set<string>, suppressedIds: Set<string>, ready: boolean, ok: boolean }`.
-- Secondary Turf check: a small hard-coded `ludhianaUrbanPolygon` GeoJSON (rough multipolygon of the Ludhiana municipal core) — any point inside it is forced into `suppressedIds` regardless of WorldCover (catches mixed-pixel edge cases on city boundary). Uses `booleanPointInPolygon` from `@turf/turf`.
+## Changes
 
-### 4. Dashboard wiring — `src/routes/_authenticated/index.tsx`
-- Compute `mask = useCroplandMask(fires)` once.
-- Derive `visibleFires = mask.ready ? fires.filter(f => mask.croplandIds.has(f.id)) : fires`.
-- Pass `visibleFires` (not `fires`) to `MapView`, `DispatchFeed`, `HourlyChart`.
-- Pass `suppressedCount = mask.suppressedIds.size` and `maskReady = mask.ready && mask.ok` to `StatusHeader`.
+### 1. `src/hooks/useCroplandMask.ts` — invert the rule
+Replace the "must be cropland" gate with an "only suppress on confirmed urban/built" gate:
 
-### 5. `MapView.tsx` — ESA Cropland layer status
-- Remove the `BACKEND REQ` fallback for the `cropland` entry. The badge now reflects mask state:
-  - `mask.ready && mask.ok` → green `MASK LIVE`
-  - in-flight → amber `CLASSIFYING…`
-  - error → red `MASK OFFLINE`
-- Toggling the layer off in the UI keeps the cropland tile hidden **and** disables suppression (so the user can see raw FIRMS for QA). Wire a new prop `onCroplandToggle(active: boolean)` so the parent can switch between `fires` and `visibleFires`.
+- Suppress a fire **only when** one of the following is true:
+  - `inUrban(lat, lng) === true` (inside the Ludhiana urban polygon), OR
+  - `landCover` is a **confirmed built/water class**: `50` (built-up), `80` (water). Anything else (including `null`, `undefined`, `30` grassland, `40` cropland, classification errors) → keep the fire.
+- Per-fire debug log:
+  ```ts
+  console.debug('[cropland-mask]', {
+    id, firmsCoords: [lat, lng], turfCoords: [lng, lat],
+    landCover: lc, urban, suppressed,
+  });
+  ```
+- Keep the `LUDHIANA_URBAN` polygon (already within the requested 74.5–76.5 E / 30.0–31.5 N envelope: 75.78–75.94 E, 30.85–30.96 N). Add an assertion comment documenting the lng-first ring order so it can't be flipped by a future edit.
+- Helper `toTurfCoord(lat, lng): [number, number]` returns `[lng, lat]`; use it everywhere Turf is called.
 
-### 6. `StatusHeader.tsx` — restore False+ Suppressed
-- Add `suppressedCount?: number` and `maskReady?: boolean` props.
-- Add a 6th counter card "False+ Suppressed" (crimson tone, `ShieldAlert` icon, sub "Outside ESA cropland mask"). Grid becomes `lg:grid-cols-6`.
-- Display rule: `maskReady ? String(suppressedCount) : "—"` — never invent a number when classification hasn't completed.
+### 2. `src/lib/cropland.server.ts` — keep behavior, document fallback
+No logic change required, but add a code comment that `landCover: null` means "unknown / API failure, do NOT suppress". The client now respects that.
 
-### 7. What stays out of scope
-- No new tables, no auth changes, no migrations.
-- Existing ESA WorldCover **tile overlay** stays as-is; this plan only adds point-sampling on top of it.
-- Cron / dispatch endpoints unchanged.
+### 3. `src/routes/_authenticated/index.tsx` — safe default
+Currently: `visibleFires = maskEnabled && mask.ready && mask.ok ? fires.filter(...) : fires`. The filter call uses `croplandIds`, which under the new rule will be "all fires minus confirmed urban/water". Switch the derivation to use the new `suppressedIds` directly:
 
-### Files touched
-- new: `src/lib/cropland.functions.ts`, `src/lib/cropland.server.ts`, `src/hooks/useCroplandMask.ts`
-- edited: `src/components/dashboard/MapView.tsx`, `src/components/dashboard/StatusHeader.tsx`, `src/routes/_authenticated/index.tsx`, `package.json` (via `bun add`)
+```ts
+const visibleFires = maskEnabled && mask.ready && mask.ok
+  ? fires.filter(f => !mask.suppressedIds.has(f.id))
+  : fires;
+```
+
+This guarantees: classification error → fire stays visible; only positively-identified urban/water gets hidden.
+
+### 4. Hook return shape
+`CroplandMask` keeps the same shape; `croplandIds` becomes "fires positively kept" (informational), `suppressedIds` is the single source of truth for hiding.
+
+### 5. Debug log toggle
+Logs gated behind `if (import.meta.env.DEV)` so production stays quiet, but visible in the user's browser console during this audit.
+
+## Files touched
+- edited: `src/hooks/useCroplandMask.ts`
+- edited: `src/routes/_authenticated/index.tsx`
+- edited: `src/lib/cropland.server.ts` (comment only)
+
+No new dependencies, no backend or schema changes.

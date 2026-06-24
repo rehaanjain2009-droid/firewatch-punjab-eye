@@ -3,6 +3,8 @@ import { getAccessToken, getProjectId } from "./gee.server";
 // ESA WorldCover v200 class codes:
 //  10 trees, 20 shrub, 30 grassland, 40 cropland, 50 built-up, 60 bare,
 //  70 snow/ice, 80 water, 90 wetland, 95 mangrove, 100 moss/lichen
+// NOTE: `landCover: null` means "unknown / sample failed". Clients MUST treat
+// null as a safe KEEP — never suppress a fire when classification is missing.
 export type LcCode = number;
 
 export function isCropland(code: LcCode | null | undefined): boolean {
