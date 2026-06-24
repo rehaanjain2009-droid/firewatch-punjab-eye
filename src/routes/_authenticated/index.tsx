@@ -99,7 +99,10 @@ function Dashboard() {
 
   const mask = useCroplandMask(fires);
   const visibleFires = useMemo(
-    () => (maskEnabled && mask.ready && mask.ok ? fires.filter((f) => mask.croplandIds.has(f.id)) : fires),
+    () =>
+      maskEnabled && mask.ready && mask.ok
+        ? fires.filter((f) => !mask.suppressedIds.has(f.id))
+        : fires,
     [fires, mask, maskEnabled],
   );
   const maskStatus: "live" | "loading" | "offline" = !maskEnabled
