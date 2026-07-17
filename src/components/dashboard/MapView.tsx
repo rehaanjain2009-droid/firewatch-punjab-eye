@@ -107,13 +107,13 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
 
   const toggle = (id: OverlayId, available: boolean) => {
     if (!available) return;
+    const willBeActive = !active.has(id);
     setActive((prev) => {
       const next = new Set(prev);
-      const willBeActive = !next.has(id);
       if (willBeActive) next.add(id); else next.delete(id);
-      if (id === "cropland") onCroplandToggle?.(willBeActive);
       return next;
     });
+    if (id === "cropland") onCroplandToggle?.(willBeActive);
   };
 
   const handlePick = (f: LiveFire) => {

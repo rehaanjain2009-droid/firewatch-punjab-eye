@@ -122,7 +122,7 @@ export function StatusHeader({ email, telegramHandle, dispatchCount = 0, fires =
           <Counter icon={Flame} label="Total Thermal Anomalies" value={String(total)} tone="crimson" sub="Active FIRMS detections" />
           <Counter icon={Zap} label="Peak Intensity · Max FRP" value={peakValue} tone="amber" sub="Fire Radiative Power" />
           <Counter icon={ShieldCheck} label="High Confidence Detections" value={String(highConfidence)} tone="crimson" sub="Confidence ≥ 80%" />
-          <Counter icon={ShieldAlert} label="False+ Suppressed" value={maskReady ? String(suppressedCount) : "—"} tone="amber" sub="Outside ESA cropland mask" />
+          <Counter icon={ShieldAlert} label="Urban Fires Detected" value={maskReady ? String(suppressedCount) : "—"} tone="amber" sub="Suppressed by ESA mask" />
           <Counter icon={Truck} label="Alerts Dispatched" value={String(dispatchCount)} tone="emerald" sub="Session dispatches" />
 
         </div>
