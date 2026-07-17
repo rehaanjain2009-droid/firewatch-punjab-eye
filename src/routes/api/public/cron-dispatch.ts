@@ -1,6 +1,24 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { booleanPointInPolygon, point, polygon } from "@turf/turf";
 import { fetchActiveFires } from "@/lib/gee.server";
 import { isDispatched, markDispatched, pruneDedup, sendTelegram } from "@/lib/telegram.server";
+
+// Ludhiana urban core polygon — MUST match src/hooks/useCroplandMask.ts.
+// GeoJSON ring convention: [lng, lat]. NASA FIRMS gives lat first; flip before
+// handing coordinates to Turf. Envelope: 75.78–75.94 E, 30.85–30.96 N.
+const LUDHIANA_URBAN = polygon([
+  [
+    [75.78, 30.85],
+    [75.94, 30.85],
+    [75.94, 30.96],
+    [75.78, 30.96],
+    [75.78, 30.85],
+  ],
+]);
+
+function isUrbanFire(lat: number, lng: number): boolean {
+  return booleanPointInPolygon(point([lng, lat]), LUDHIANA_URBAN);
+}
 
 const BLOCKS: { name: string; lat: number; lng: number }[] = [
   { name: "Ludhiana", lat: 30.9010, lng: 75.8573 },
@@ -66,7 +84,19 @@ async function handle(request: Request) {
     return Response.json({ ok: false, error: "FIRMS_MAP_KEY not configured" }, { status: 500 });
   }
 
-  const candidates = data.fires
+  // Step 2 — Geospatial mask: drop any fire that lands inside the Ludhiana
+  // urban polygon before we spend a DB/Telegram call on it.
+  const agricultural: typeof data.fires = [];
+  let suppressedUrban = 0;
+  for (const f of data.fires) {
+    if (isUrbanFire(f.lat, f.lng)) {
+      suppressedUrban++;
+      continue;
+    }
+    agricultural.push(f);
+  }
+
+  const candidates = agricultural
     .filter((f) => f.confidence >= MIN_CONFIDENCE && !isDispatched(f))
     .sort((a, b) => b.confidence - a.confidence)
     .slice(0, MAX_PER_RUN);
@@ -90,6 +120,8 @@ async function handle(request: Request) {
   return Response.json({
     ok: true,
     scanned: data.fires.length,
+    suppressedUrban,
+    agricultural: agricultural.length,
     source: data.source,
     threshold: MIN_CONFIDENCE,
     dispatched: results.filter((r) => r.ok).length,
