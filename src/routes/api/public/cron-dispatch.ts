@@ -84,7 +84,19 @@ async function handle(request: Request) {
     return Response.json({ ok: false, error: "FIRMS_MAP_KEY not configured" }, { status: 500 });
   }
 
-  const candidates = data.fires
+  // Step 2 — Geospatial mask: drop any fire that lands inside the Ludhiana
+  // urban polygon before we spend a DB/Telegram call on it.
+  const agricultural: typeof data.fires = [];
+  let suppressedUrban = 0;
+  for (const f of data.fires) {
+    if (isUrbanFire(f.lat, f.lng)) {
+      suppressedUrban++;
+      continue;
+    }
+    agricultural.push(f);
+  }
+
+  const candidates = agricultural
     .filter((f) => f.confidence >= MIN_CONFIDENCE && !isDispatched(f))
     .sort((a, b) => b.confidence - a.confidence)
     .slice(0, MAX_PER_RUN);
@@ -108,6 +120,8 @@ async function handle(request: Request) {
   return Response.json({
     ok: true,
     scanned: data.fires.length,
+    suppressedUrban,
+    agricultural: agricultural.length,
     source: data.source,
     threshold: MIN_CONFIDENCE,
     dispatched: results.filter((r) => r.ok).length,
