@@ -1,6 +1,24 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { booleanPointInPolygon, point, polygon } from "@turf/turf";
 import { fetchActiveFires } from "@/lib/gee.server";
 import { isDispatched, markDispatched, pruneDedup, sendTelegram } from "@/lib/telegram.server";
+
+// Ludhiana urban core polygon — MUST match src/hooks/useCroplandMask.ts.
+// GeoJSON ring convention: [lng, lat]. NASA FIRMS gives lat first; flip before
+// handing coordinates to Turf. Envelope: 75.78–75.94 E, 30.85–30.96 N.
+const LUDHIANA_URBAN = polygon([
+  [
+    [75.78, 30.85],
+    [75.94, 30.85],
+    [75.94, 30.96],
+    [75.78, 30.96],
+    [75.78, 30.85],
+  ],
+]);
+
+function isUrbanFire(lat: number, lng: number): boolean {
+  return booleanPointInPolygon(point([lng, lat]), LUDHIANA_URBAN);
+}
 
 const BLOCKS: { name: string; lat: number; lng: number }[] = [
   { name: "Ludhiana", lat: 30.9010, lng: 75.8573 },
