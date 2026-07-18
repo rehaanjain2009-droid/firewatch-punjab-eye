@@ -219,7 +219,7 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
               const badgeColor =
                 l.badge === "LIVE" || l.badge === "MASK LIVE"
                   ? "text-[oklch(0.85_0.18_155)]"
-                  : l.badge === "BACKEND REQ" || l.badge === "CLASSIFYING…"
+                  : l.badge === "BACKEND REQ" || l.badge === "CLASSIFYING…" || l.badge === "DEMO IR"
                     ? "text-[oklch(0.88_0.17_80)]"
                     : l.badge === "MASK OFFLINE"
                       ? "text-[oklch(0.78_0.22_25)]"
