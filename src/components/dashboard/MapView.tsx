@@ -86,13 +86,12 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
 
   const overlays: OverlayDef[] = [
     { id: "firms", label: "FIRMS Thermal", icon: Flame, available: true, badge: live ? "LIVE" : undefined },
-    { id: "nbr", label: "Sentinel-2 NBR", icon: Satellite, available: !!nbrTile, badge: nbrTile ? "LIVE" : "BACKEND REQ" },
+    { id: "nbr", label: "Sentinel-2 NIR", icon: Satellite, available: true, badge: nbrTile ? "LIVE" : "DEMO IR" },
     { id: "cropland", label: "ESA Cropland", icon: Sprout, available: true, badge: cropBadge },
     { id: "radar", label: "Sentinel-1 Radar", icon: Radar, available: false, badge: "COMING SOON" },
   ];
 
   const initial = new Set<OverlayId>(["firms", "cropland"]);
-  if (nbrTile) initial.add("nbr");
   const [active, setActive] = useState<Set<OverlayId>>(initial);
   const [selected, setSelected] = useState<LiveFire | null>(null);
   const [flyTarget, setFlyTarget] = useState<LiveFire | null>(null);
