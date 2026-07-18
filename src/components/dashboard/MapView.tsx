@@ -68,7 +68,7 @@ function FitToFires({ fires }: { fires: LiveFire[] }) {
 }
 
 type OverlayId = "firms" | "nbr" | "cropland" | "radar";
-type OverlayBadge = "LIVE" | "MASK LIVE" | "CLASSIFYING…" | "MASK OFFLINE" | "BACKEND REQ" | "COMING SOON";
+type OverlayBadge = "LIVE" | "MASK LIVE" | "CLASSIFYING…" | "MASK OFFLINE" | "BACKEND REQ" | "COMING SOON" | "DEMO IR";
 type OverlayDef = {
   id: OverlayId;
   label: string;
