@@ -68,7 +68,7 @@ function FitToFires({ fires }: { fires: LiveFire[] }) {
 }
 
 type OverlayId = "firms" | "nbr" | "cropland" | "radar";
-type OverlayBadge = "LIVE" | "MASK LIVE" | "CLASSIFYING…" | "MASK OFFLINE" | "BACKEND REQ" | "COMING SOON";
+type OverlayBadge = "LIVE" | "MASK LIVE" | "CLASSIFYING…" | "MASK OFFLINE" | "BACKEND REQ" | "COMING SOON" | "DEMO IR";
 type OverlayDef = {
   id: OverlayId;
   label: string;
@@ -86,24 +86,16 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
 
   const overlays: OverlayDef[] = [
     { id: "firms", label: "FIRMS Thermal", icon: Flame, available: true, badge: live ? "LIVE" : undefined },
-    { id: "nbr", label: "Sentinel-2 NBR", icon: Satellite, available: !!nbrTile, badge: nbrTile ? "LIVE" : "BACKEND REQ" },
+    { id: "nbr", label: "Sentinel-2 NIR", icon: Satellite, available: true, badge: nbrTile ? "LIVE" : "DEMO IR" },
     { id: "cropland", label: "ESA Cropland", icon: Sprout, available: true, badge: cropBadge },
     { id: "radar", label: "Sentinel-1 Radar", icon: Radar, available: false, badge: "COMING SOON" },
   ];
 
   const initial = new Set<OverlayId>(["firms", "cropland"]);
-  if (nbrTile) initial.add("nbr");
   const [active, setActive] = useState<Set<OverlayId>>(initial);
   const [selected, setSelected] = useState<LiveFire | null>(null);
   const [flyTarget, setFlyTarget] = useState<LiveFire | null>(null);
 
-  useEffect(() => {
-    setActive((prev) => {
-      const next = new Set(prev);
-      if (nbrTile) next.add("nbr"); else next.delete("nbr");
-      return next;
-    });
-  }, [nbrTile]);
 
   const toggle = (id: OverlayId, available: boolean) => {
     if (!available) return;
@@ -169,11 +161,22 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
             subdomains={["a", "b", "c", "d"]}
             maxZoom={19}
           />
-          {active.has("cropland") && cropTile && (
-            <TileLayer url={cropTile.tileUrl} opacity={0.45} maxZoom={19} />
+          {/* Sentinel-2 optical — above basemap, below cropland + FIRMS */}
+          {active.has("nbr") && (
+            nbrTile ? (
+              <TileLayer url={nbrTile.tileUrl} opacity={0.85} maxZoom={19} zIndex={200} />
+            ) : (
+              <TileLayer
+                attribution='Imagery &copy; Esri · Sentinel-2 fallback'
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                opacity={0.9}
+                maxZoom={19}
+                zIndex={200}
+              />
+            )
           )}
-          {active.has("nbr") && nbrTile && (
-            <TileLayer url={nbrTile.tileUrl} opacity={0.75} maxZoom={19} />
+          {active.has("cropland") && cropTile && (
+            <TileLayer url={cropTile.tileUrl} opacity={0.45} maxZoom={19} zIndex={300} />
           )}
 
           {active.has("firms") && fires.map((f) => {
@@ -216,7 +219,7 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
               const badgeColor =
                 l.badge === "LIVE" || l.badge === "MASK LIVE"
                   ? "text-[oklch(0.85_0.18_155)]"
-                  : l.badge === "BACKEND REQ" || l.badge === "CLASSIFYING…"
+                  : l.badge === "BACKEND REQ" || l.badge === "CLASSIFYING…" || l.badge === "DEMO IR"
                     ? "text-[oklch(0.88_0.17_80)]"
                     : l.badge === "MASK OFFLINE"
                       ? "text-[oklch(0.78_0.22_25)]"
