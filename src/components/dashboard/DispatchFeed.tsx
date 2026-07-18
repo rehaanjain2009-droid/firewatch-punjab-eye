@@ -177,11 +177,4 @@ export function DispatchFeed({ fires, live, onDispatched }: Props) {
     </div>
   );
 }
-            </article>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
