@@ -161,11 +161,22 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
             subdomains={["a", "b", "c", "d"]}
             maxZoom={19}
           />
-          {active.has("cropland") && cropTile && (
-            <TileLayer url={cropTile.tileUrl} opacity={0.45} maxZoom={19} />
+          {/* Sentinel-2 optical — above basemap, below cropland + FIRMS */}
+          {active.has("nbr") && (
+            nbrTile ? (
+              <TileLayer url={nbrTile.tileUrl} opacity={0.85} maxZoom={19} zIndex={200} />
+            ) : (
+              <TileLayer
+                attribution='Imagery &copy; Esri · Sentinel-2 fallback'
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                opacity={0.9}
+                maxZoom={19}
+                zIndex={200}
+              />
+            )
           )}
-          {active.has("nbr") && nbrTile && (
-            <TileLayer url={nbrTile.tileUrl} opacity={0.75} maxZoom={19} />
+          {active.has("cropland") && cropTile && (
+            <TileLayer url={cropTile.tileUrl} opacity={0.45} maxZoom={19} zIndex={300} />
           )}
 
           {active.has("firms") && fires.map((f) => {
