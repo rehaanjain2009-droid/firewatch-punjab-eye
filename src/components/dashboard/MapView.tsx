@@ -96,13 +96,6 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
   const [selected, setSelected] = useState<LiveFire | null>(null);
   const [flyTarget, setFlyTarget] = useState<LiveFire | null>(null);
 
-  useEffect(() => {
-    setActive((prev) => {
-      const next = new Set(prev);
-      if (nbrTile) next.add("nbr"); else next.delete("nbr");
-      return next;
-    });
-  }, [nbrTile]);
 
   const toggle = (id: OverlayId, available: boolean) => {
     if (!available) return;
