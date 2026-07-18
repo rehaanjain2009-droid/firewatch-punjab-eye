@@ -161,7 +161,19 @@ export function DispatchFeed({ fires, live, onDispatched }: Props) {
                   ⚠ {errors[f.id]}
                 </div>
               )}
+              <button
+                onClick={() => console.log("Opening Sentinel-2 optical view...", { id: f.id, lat: f.lat, lng: f.lng })}
+                className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-[oklch(0.78_0.10_220)/40] bg-[oklch(0.78_0.10_220)/10] px-2 py-1.5 text-[11px] font-semibold text-[oklch(0.85_0.10_220)] transition-colors hover:bg-[oklch(0.78_0.10_220)/20]"
+              >
+                <Satellite className="h-3.5 w-3.5" /> Verify Burn Scar
+              </button>
             </article>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
           );
         })}
       </div>
