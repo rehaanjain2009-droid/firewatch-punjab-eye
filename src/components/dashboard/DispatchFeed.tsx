@@ -3,6 +3,7 @@ import { Copy, Send, Clock, AlertTriangle, Radio, Check, Loader2, Satellite } fr
 import { useServerFn } from "@tanstack/react-start";
 import { dispatchTelegram } from "@/lib/gee.functions";
 import type { LiveFire } from "./MapView";
+import { BurnScarModal } from "./BurnScarModal";
 
 function confTone(c: number) {
   if (c >= 80) return { label: "CRITICAL", cls: "text-[oklch(0.78_0.22_25)] bg-[oklch(0.65_0.24_25/0.12)] border-[oklch(0.65_0.24_25/0.5)]" };
@@ -27,6 +28,7 @@ export function DispatchFeed({ fires, live, onDispatched }: Props) {
   const [sending, setSending] = useState<Set<string>>(new Set());
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [acked] = useState<Set<string>>(new Set());
+  const [verifyFire, setVerifyFire] = useState<LiveFire | null>(null);
   const sendDispatch = useServerFn(dispatchTelegram);
 
   const sorted = useMemo(() => [...fires].sort((a, b) => b.confidence - a.confidence), [fires]);
@@ -162,8 +164,8 @@ export function DispatchFeed({ fires, live, onDispatched }: Props) {
                 </div>
               )}
               <button
-                onClick={() => console.log("Opening Sentinel-2 optical view...", { id: f.id, lat: f.lat, lng: f.lng })}
-                className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-[oklch(0.78_0.10_220)/40] bg-[oklch(0.78_0.10_220)/10] px-2 py-1.5 text-[11px] font-semibold text-[oklch(0.85_0.10_220)] transition-colors hover:bg-[oklch(0.78_0.10_220)/20]"
+                onClick={() => setVerifyFire(f)}
+                className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-[oklch(0.78_0.10_220/0.4)] bg-[oklch(0.78_0.10_220/0.1)] px-2 py-1.5 text-[11px] font-semibold text-[oklch(0.85_0.10_220)] transition-colors hover:bg-[oklch(0.78_0.10_220/0.2)]"
               >
                 <Satellite className="h-3.5 w-3.5" /> Verify Burn Scar
               </button>
@@ -171,6 +173,7 @@ export function DispatchFeed({ fires, live, onDispatched }: Props) {
           );
         })}
       </div>
+      <BurnScarModal fire={verifyFire} open={!!verifyFire} onOpenChange={(o) => !o && setVerifyFire(null)} />
     </div>
   );
 }
