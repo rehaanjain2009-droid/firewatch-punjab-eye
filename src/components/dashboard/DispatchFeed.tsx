@@ -28,6 +28,7 @@ export function DispatchFeed({ fires, live, onDispatched }: Props) {
   const [sending, setSending] = useState<Set<string>>(new Set());
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [acked] = useState<Set<string>>(new Set());
+  const [verifyFire, setVerifyFire] = useState<LiveFire | null>(null);
   const sendDispatch = useServerFn(dispatchTelegram);
 
   const sorted = useMemo(() => [...fires].sort((a, b) => b.confidence - a.confidence), [fires]);
