@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { Activity, Flame, Zap, ShieldCheck, Truck, ShieldAlert, Radio, LogOut, User } from "lucide-react";
+import { Activity, Flame, Zap, ShieldCheck, Truck, ShieldAlert, Radio, LogOut, User, Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { TELEGRAM_DISPATCH_URL } from "@/components/dashboard/OfficerOnboardingModal";
 import type { LiveFire } from "@/components/dashboard/MapView";
 
 function Pill({ tone, children }: { tone: "emerald" | "amber" | "slate" | "crimson"; children: React.ReactNode }) {
