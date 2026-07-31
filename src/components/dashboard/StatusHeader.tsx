@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { Activity, Flame, Zap, ShieldCheck, Truck, ShieldAlert, Radio, LogOut, User } from "lucide-react";
+import { Activity, Flame, Zap, ShieldCheck, Truck, ShieldAlert, Radio, LogOut, User, Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { TELEGRAM_DISPATCH_URL } from "@/components/dashboard/OfficerOnboardingModal";
 import type { LiveFire } from "@/components/dashboard/MapView";
 
 function Pill({ tone, children }: { tone: "emerald" | "amber" | "slate" | "crimson"; children: React.ReactNode }) {
@@ -107,6 +108,14 @@ export function StatusHeader({ email, telegramHandle, dispatchCount = 0, fires =
               </span>
             )}
             <span className="hidden lg:inline text-foreground" id="utc-clock">--:--:-- IST</span>
+            <a
+              href={TELEGRAM_DISPATCH_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded border border-primary/40 bg-primary/10 px-2 py-1 font-semibold uppercase tracking-wider text-primary hover:bg-primary/20"
+            >
+              <Send className="h-3 w-3" /> <span className="hidden sm:inline">Join Telegram</span>
+            </a>
             <button
               onClick={signOut}
               disabled={busy}
