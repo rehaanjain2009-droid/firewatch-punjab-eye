@@ -127,7 +127,7 @@ function Dashboard() {
       />
       <main className="mx-auto max-w-[1600px] px-5 py-4 space-y-4">
         <section className="grid gap-4 lg:grid-cols-5">
-          <div className="lg:col-span-3 h-[560px]">
+          <div className="lg:col-span-3 h-[520px] lg:h-[calc(100vh-330px)] lg:min-h-[560px]">
             <ClientMapView
               fires={visibleFires}
               live={firesLive}
@@ -138,19 +138,16 @@ function Dashboard() {
               onCroplandToggle={setMaskEnabled}
             />
           </div>
-          <div className="lg:col-span-2 h-[560px]">
+          <div className="lg:col-span-2 h-[520px] lg:h-[calc(100vh-330px)] lg:min-h-[560px]">
             <DispatchFeed fires={visibleFires} live={firesLive} onDispatched={() => setDispatchCount((c) => c + 1)} />
           </div>
         </section>
 
-        <section className="h-[340px]">
+        <section className="h-[340px] pb-4">
           <HourlyChart fires={visibleFires} />
         </section>
-
-        <section className="h-[280px] pb-4">
-          <SystemConsole />
-        </section>
       </main>
+      <OfficerOnboardingModal />
     </div>
   );
 }
