@@ -107,6 +107,14 @@ export function StatusHeader({ email, telegramHandle, dispatchCount = 0, fires =
               </span>
             )}
             <span className="hidden lg:inline text-foreground" id="utc-clock">--:--:-- IST</span>
+            <a
+              href={TELEGRAM_DISPATCH_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded border border-primary/40 bg-primary/10 px-2 py-1 font-semibold uppercase tracking-wider text-primary hover:bg-primary/20"
+            >
+              <Send className="h-3 w-3" /> <span className="hidden sm:inline">Join Telegram</span>
+            </a>
             <button
               onClick={signOut}
               disabled={busy}
