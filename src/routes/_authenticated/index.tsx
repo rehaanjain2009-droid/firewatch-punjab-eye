@@ -5,7 +5,7 @@ import { StatusHeader } from "@/components/dashboard/StatusHeader";
 import type { LiveFire } from "@/components/dashboard/MapView";
 import { DispatchFeed } from "@/components/dashboard/DispatchFeed";
 import { HourlyChart } from "@/components/dashboard/HourlyChart";
-import { SystemConsole } from "@/components/dashboard/SystemConsole";
+import { OfficerOnboardingModal } from "@/components/dashboard/OfficerOnboardingModal";
 import { getActiveFires, getGeeStatus, getTileLayers } from "@/lib/gee.functions";
 import { getMyProfile } from "@/lib/profile.functions";
 import { useCroplandMask } from "@/hooks/useCroplandMask";
