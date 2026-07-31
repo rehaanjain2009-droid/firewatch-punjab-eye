@@ -3,7 +3,7 @@ import { ExternalLink, ShieldCheck, Send } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export const TELEGRAM_DISPATCH_URL =
-  (import.meta.env.VITE_TELEGRAM_INVITE_URL as string | undefined) ?? "https://t.me/your_dispatch_channel";
+  (import.meta.env.VITE_TELEGRAM_INVITE_URL as string | undefined) ?? "https://t.me/+yYxppv7QaXI2ZjFl";
 
 const STORAGE_KEY = "hasCompletedOnboarding";
 
