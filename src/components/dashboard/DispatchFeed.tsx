@@ -22,9 +22,15 @@ function evasionTag(acqTime: string): "evening" | "midnight" | null {
   return null;
 }
 
-type Props = { fires: LiveFire[]; live: boolean; onDispatched?: () => void };
+type Props = {
+  fires: LiveFire[];
+  live: boolean;
+  onDispatched?: () => void;
+  places?: Map<string, PlaceInfo>;
+};
 
-export function DispatchFeed({ fires, live, onDispatched }: Props) {
+export function DispatchFeed({ fires, live, onDispatched, places }: Props) {
+
   const [copied, setCopied] = useState<string | null>(null);
   const [dispatched, setDispatched] = useState<Set<string>>(new Set());
   const [sending, setSending] = useState<Set<string>>(new Set());
