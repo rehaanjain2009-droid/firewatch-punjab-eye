@@ -24,6 +24,9 @@ type Tile = { id: "nbr" | "cropland"; label: string; tileUrl: string };
 const FOCUS: [number, number] = [30.901, 75.857];
 const DEFAULT_ZOOM = 10;
 
+// Ludhiana urban core (non-agricultural) — 9 km radius buffer, [lng, lat] order for Turf
+const URBAN_MASK = turf.circle([75.8573, 30.9010], 9, { steps: 64, units: "kilometers" });
+
 const sevColor = (c: number) => c >= 80 ? "oklch(0.65 0.24 25)" : c >= 60 ? "oklch(0.82 0.17 80)" : "oklch(0.78 0.18 155)";
 const sevHex = (c: number) => c >= 80 ? "#e8473a" : c >= 60 ? "#f0b400" : "#22c08a";
 const sevLevel = (c: number): "high" | "med" | "low" => c >= 80 ? "high" : c >= 60 ? "med" : "low";
