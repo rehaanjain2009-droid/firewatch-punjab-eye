@@ -139,6 +139,13 @@ export function DispatchFeed({ fires, live, onDispatched, places }: Props) {
                     <span className="opacity-40">|</span>
                     <span className={`text-mono text-[9px] uppercase tracking-wider ${status === "new" ? "text-[oklch(0.78_0.22_25)]" : status === "ack" ? "text-[oklch(0.88_0.17_80)]" : "text-[oklch(0.85_0.18_155)]"}`}>● {status.toUpperCase()}</span>
                   </div>
+                  <div className="mt-1 flex items-center gap-1.5 text-mono text-[10px] text-[oklch(0.85_0.18_155)]">
+                    <MapPin className="h-3 w-3 shrink-0" />
+                    <span className="truncate">
+                      Location: {places?.get(f.id)?.ok ? places.get(f.id)!.label : "resolving land use…"}
+                    </span>
+                  </div>
+
                 </div>
               </div>
               <div className="mt-2.5 grid grid-cols-2 gap-2">
