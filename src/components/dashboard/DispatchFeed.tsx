@@ -1,9 +1,11 @@
 import { useState, useMemo } from "react";
-import { Copy, Send, Clock, AlertTriangle, Radio, Check, Loader2, Satellite } from "lucide-react";
+import { Copy, Send, Clock, AlertTriangle, Radio, Check, Loader2, Satellite, MapPin } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { dispatchTelegram } from "@/lib/gee.functions";
 import type { LiveFire } from "./MapView";
 import { BurnScarModal } from "./BurnScarModal";
+import type { PlaceInfo } from "@/hooks/useCroplandMask";
+
 
 function confTone(c: number) {
   if (c >= 80) return { label: "CRITICAL", cls: "text-[oklch(0.78_0.22_25)] bg-[oklch(0.65_0.24_25/0.12)] border-[oklch(0.65_0.24_25/0.5)]" };
