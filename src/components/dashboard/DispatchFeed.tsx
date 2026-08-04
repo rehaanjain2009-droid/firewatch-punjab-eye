@@ -1,9 +1,11 @@
 import { useState, useMemo } from "react";
-import { Copy, Send, Clock, AlertTriangle, Radio, Check, Loader2, Satellite } from "lucide-react";
+import { Copy, Send, Clock, AlertTriangle, Radio, Check, Loader2, Satellite, MapPin } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { dispatchTelegram } from "@/lib/gee.functions";
 import type { LiveFire } from "./MapView";
 import { BurnScarModal } from "./BurnScarModal";
+import type { PlaceInfo } from "@/hooks/useCroplandMask";
+
 
 function confTone(c: number) {
   if (c >= 80) return { label: "CRITICAL", cls: "text-[oklch(0.78_0.22_25)] bg-[oklch(0.65_0.24_25/0.12)] border-[oklch(0.65_0.24_25/0.5)]" };
@@ -20,9 +22,15 @@ function evasionTag(acqTime: string): "evening" | "midnight" | null {
   return null;
 }
 
-type Props = { fires: LiveFire[]; live: boolean; onDispatched?: () => void };
+type Props = {
+  fires: LiveFire[];
+  live: boolean;
+  onDispatched?: () => void;
+  places?: Map<string, PlaceInfo>;
+};
 
-export function DispatchFeed({ fires, live, onDispatched }: Props) {
+export function DispatchFeed({ fires, live, onDispatched, places }: Props) {
+
   const [copied, setCopied] = useState<string | null>(null);
   const [dispatched, setDispatched] = useState<Set<string>>(new Set());
   const [sending, setSending] = useState<Set<string>>(new Set());
@@ -131,6 +139,13 @@ export function DispatchFeed({ fires, live, onDispatched }: Props) {
                     <span className="opacity-40">|</span>
                     <span className={`text-mono text-[9px] uppercase tracking-wider ${status === "new" ? "text-[oklch(0.78_0.22_25)]" : status === "ack" ? "text-[oklch(0.88_0.17_80)]" : "text-[oklch(0.85_0.18_155)]"}`}>● {status.toUpperCase()}</span>
                   </div>
+                  <div className="mt-1 flex items-center gap-1.5 text-mono text-[10px] text-[oklch(0.85_0.18_155)]">
+                    <MapPin className="h-3 w-3 shrink-0" />
+                    <span className="truncate">
+                      Location: {places?.get(f.id)?.ok ? places.get(f.id)!.label : "resolving land use…"}
+                    </span>
+                  </div>
+
                 </div>
               </div>
               <div className="mt-2.5 grid grid-cols-2 gap-2">

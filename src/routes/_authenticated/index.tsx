@@ -139,7 +139,7 @@ function Dashboard() {
             />
           </div>
           <div className="lg:col-span-2 h-[520px] lg:h-[calc(100vh-330px)] lg:min-h-[560px]">
-            <DispatchFeed fires={visibleFires} live={firesLive} onDispatched={() => setDispatchCount((c) => c + 1)} />
+            <DispatchFeed fires={visibleFires} live={firesLive} places={mask.places} onDispatched={() => setDispatchCount((c) => c + 1)} />
           </div>
         </section>
 
