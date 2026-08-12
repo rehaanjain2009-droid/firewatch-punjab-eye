@@ -146,7 +146,7 @@ export type FirePoint = {
   satellite: string;
 };
 
-let cachedFires: { ts: number; data: FirePoint[]; source: string } | null = null;
+
 
 function parseCsv(text: string): Record<string, string>[] {
   const lines = text.trim().split(/\r?\n/);
