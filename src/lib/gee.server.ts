@@ -232,7 +232,7 @@ export async function fetchActiveFires(dayRange = 1): Promise<{ fires: FirePoint
   }
 
   const source = active.length ? active.join(" + ") : "none";
-  cachedFires = { ts: Date.now(), data: fires, source };
+  
   return { fires, source };
 }
 
