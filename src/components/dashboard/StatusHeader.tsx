@@ -41,9 +41,9 @@ function Counter({ icon: Icon, label, value, tone, sub }: { icon: React.Componen
   );
 }
 
-type Props = { email?: string | null; telegramHandle?: string | null; dispatchCount?: number; fires?: LiveFire[]; firmsLive?: boolean; suppressedCount?: number; maskReady?: boolean };
+type Props = { outcome?: { verified: number; falseAlarms: number; pending: number }; email?: string | null; telegramHandle?: string | null; dispatchCount?: number; fires?: LiveFire[]; firmsLive?: boolean; suppressedCount?: number; maskReady?: boolean };
 
-export function StatusHeader({ email, telegramHandle, dispatchCount = 0, fires = [], firmsLive = false, suppressedCount = 0, maskReady = false }: Props = {}) {
+export function StatusHeader({ outcome, email, telegramHandle, dispatchCount = 0, fires = [], firmsLive = false, suppressedCount = 0, maskReady = false }: Props = {}) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
@@ -124,6 +124,13 @@ export function StatusHeader({ email, telegramHandle, dispatchCount = 0, fires =
               <LogOut className="h-3 w-3" /> Sign out
             </button>
           </div>
+        </div>
+
+        <div className="text-mono mt-3 flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-wider">
+          <span className="text-muted-foreground">Field outcomes</span>
+          <Pill tone="emerald"><ShieldCheck className="h-3 w-3" />Verified {outcome?.verified ?? 0}</Pill>
+          <Pill tone="amber"><ShieldAlert className="h-3 w-3" />False alarms {outcome?.falseAlarms ?? 0}</Pill>
+          <Pill tone="slate">Pending {outcome?.pending ?? 0}</Pill>
         </div>
 
         <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6">
