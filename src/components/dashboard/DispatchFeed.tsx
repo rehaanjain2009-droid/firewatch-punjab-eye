@@ -22,14 +22,24 @@ function evasionTag(acqTime: string): "evening" | "midnight" | null {
   return null;
 }
 
+export type FireStatus = "pending" | "verified" | "false_alarm";
+
 type Props = {
   fires: LiveFire[];
   live: boolean;
   onDispatched?: () => void;
   places?: Map<string, PlaceInfo>;
+  statuses?: Record<string, FireStatus>;
+  onStatusChange?: (id: string, status: FireStatus) => void;
 };
 
-export function DispatchFeed({ fires, live, onDispatched, places }: Props) {
+const STATUS_OPTIONS: { key: FireStatus; label: string; cls: string }[] = [
+  { key: "pending", label: "Pending", cls: "bg-muted/60 text-foreground border-border" },
+  { key: "verified", label: "Verified Burn", cls: "bg-[oklch(0.78_0.18_155/0.18)] text-[oklch(0.85_0.18_155)] border-[oklch(0.78_0.18_155/0.5)]" },
+  { key: "false_alarm", label: "False Alarm", cls: "bg-[oklch(0.82_0.17_80/0.18)] text-[oklch(0.88_0.17_80)] border-[oklch(0.82_0.17_80/0.5)]" },
+];
+
+export function DispatchFeed({ fires, live, onDispatched, places, statuses, onStatusChange }: Props) {
 
   const [copied, setCopied] = useState<string | null>(null);
   const [dispatched, setDispatched] = useState<Set<string>>(new Set());
@@ -39,7 +49,7 @@ export function DispatchFeed({ fires, live, onDispatched, places }: Props) {
   const [verifyFire, setVerifyFire] = useState<LiveFire | null>(null);
   const sendDispatch = useServerFn(dispatchTelegram);
 
-  const sorted = useMemo(() => [...fires].sort((a, b) => b.confidence - a.confidence), [fires]);
+  const sorted = useMemo(() => [...fires].sort((a, b) => (b.frp || 0) - (a.frp || 0)), [fires]);
   const unhandled = sorted.filter((f) => !dispatched.has(f.id) && !acked.has(f.id)).length;
 
   const gmapsUrl = (f: LiveFire): string | null => {
@@ -127,6 +137,11 @@ export function DispatchFeed({ fires, live, onDispatched, places }: Props) {
                         {evasion === "evening" ? "17:00 EVASION" : "MIDNIGHT EVASION"}
                       </span>
                     )}
+                    {f.frp > 50 && (
+                      <span className="text-mono text-[9px] font-bold uppercase tracking-wider rounded border border-[oklch(0.65_0.24_25/0.6)] bg-[oklch(0.65_0.24_25/0.18)] px-1.5 py-0.5 text-[oklch(0.78_0.22_25)]">
+                        High Priority
+                      </span>
+                    )}
                     <span className="text-mono text-[9px] uppercase tracking-wider text-muted-foreground">{f.satellite}</span>
                   </div>
                   <h3 className="mt-1.5 text-sm font-bold text-foreground leading-tight">
@@ -178,6 +193,24 @@ export function DispatchFeed({ fires, live, onDispatched, places }: Props) {
                   ⚠ {errors[f.id]}
                 </div>
               )}
+              <div className="mt-2 flex items-center gap-1.5">
+                <span className="text-mono text-[9px] uppercase tracking-wider text-muted-foreground">Outcome</span>
+                <div className="ml-auto flex gap-1">
+                  {STATUS_OPTIONS.map((o) => {
+                    const cur = statuses?.[f.id] ?? "pending";
+                    const on = cur === o.key;
+                    return (
+                      <button
+                        key={o.key}
+                        onClick={() => onStatusChange?.(f.id, o.key)}
+                        className={`text-mono rounded border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider transition-colors ${on ? o.cls : "border-border bg-transparent text-muted-foreground hover:text-foreground"}`}
+                      >
+                        {o.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               <button
                 onClick={() => setVerifyFire(f)}
                 className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-[oklch(0.78_0.10_220/0.4)] bg-[oklch(0.78_0.10_220/0.1)] px-2 py-1.5 text-[11px] font-semibold text-[oklch(0.85_0.10_220)] transition-colors hover:bg-[oklch(0.78_0.10_220/0.2)]"
