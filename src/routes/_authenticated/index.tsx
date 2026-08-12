@@ -3,7 +3,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { StatusHeader } from "@/components/dashboard/StatusHeader";
 import type { LiveFire } from "@/components/dashboard/MapView";
-import { DispatchFeed } from "@/components/dashboard/DispatchFeed";
+import { DispatchFeed, type FireStatus } from "@/components/dashboard/DispatchFeed";
 import { HourlyChart } from "@/components/dashboard/HourlyChart";
 import { OfficerOnboardingModal } from "@/components/dashboard/OfficerOnboardingModal";
 import { getActiveFires, getGeeStatus, getTileLayers } from "@/lib/gee.functions";
@@ -75,6 +75,7 @@ function Dashboard() {
   const [firesLive, setFiresLive] = useState(false);
   const [firesSource, setFiresSource] = useState<string>("");
   const [maskEnabled, setMaskEnabled] = useState(true);
+  const [statuses, setStatuses] = useState<Record<string, FireStatus>>({});
   const fetchFires = useServerFn(getActiveFires);
   const fetchStatus = useServerFn(getGeeStatus);
   const fetchTiles = useServerFn(getTileLayers);
@@ -112,6 +113,17 @@ function Dashboard() {
       : mask.ready && mask.ok
         ? "live"
         : "offline";
+  const outcome = useMemo(() => {
+    let verified = 0;
+    let falseAlarms = 0;
+    for (const f of visibleFires) {
+      const st = statuses[f.id];
+      if (st === "verified") verified += 1;
+      else if (st === "false_alarm") falseAlarms += 1;
+    }
+    return { verified, falseAlarms, pending: visibleFires.length - verified - falseAlarms };
+  }, [visibleFires, statuses]);
+
   const suppressedCount = maskEnabled && mask.ready && mask.ok ? mask.suppressedIds.size : 0;
 
   return (
@@ -124,6 +136,7 @@ function Dashboard() {
         firmsLive={firesLive}
         suppressedCount={suppressedCount}
         maskReady={maskEnabled && mask.ready && mask.ok}
+        outcome={outcome}
       />
       <main className="mx-auto max-w-[1600px] px-5 py-4 space-y-4">
         <section className="grid gap-4 lg:grid-cols-5">
@@ -139,7 +152,14 @@ function Dashboard() {
             />
           </div>
           <div className="lg:col-span-2 h-[520px] lg:h-[calc(100vh-330px)] lg:min-h-[560px]">
-            <DispatchFeed fires={visibleFires} live={firesLive} places={mask.places} onDispatched={() => setDispatchCount((c) => c + 1)} />
+            <DispatchFeed
+              fires={visibleFires}
+              live={firesLive}
+              places={mask.places}
+              statuses={statuses}
+              onStatusChange={(id, status) => setStatuses((s) => ({ ...s, [id]: status }))}
+              onDispatched={() => setDispatchCount((c) => c + 1)}
+            />
           </div>
         </section>
 
