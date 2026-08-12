@@ -178,32 +178,59 @@ export async function fetchActiveFires(dayRange = 1): Promise<{ fires: FirePoint
     return { fires: cachedFires.data, source: cachedFires.source };
   }
   const bbox = PUNJAB_BBOX.join(",");
-  // Try VIIRS SNPP NRT first; fall back to NOAA-20 then MODIS
-  const sources = ["VIIRS_SNPP_NRT", "VIIRS_NOAA20_NRT", "MODIS_NRT"];
-  for (const src of sources) {
-    const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${key}/${src}/${bbox}/${dayRange}`;
-    const res = await fetch(url);
-    if (!res.ok) continue;
-    const text = await res.text();
-    if (text.startsWith("Invalid") || text.startsWith("No fire") || !text.includes("latitude")) continue;
-    const rows = parseCsv(text);
-    const fires: FirePoint[] = rows.map((r, i) => ({
-      id: `FIRMS-${src.split("_")[0]}-${i + 1}`,
-      lat: Number(r.latitude),
-      lng: Number(r.longitude),
-      confidence: confToNum(r.confidence),
-      brightness: Number(r.bright_ti4 ?? r.brightness ?? 0),
-      frp: Number(r.frp ?? 0),
-      acqDate: r.acq_date ?? "",
-      acqTime: r.acq_time ?? "",
-      daynight: (r.daynight as "D" | "N") ?? "D",
-      satellite: r.satellite ?? src,
-    })).filter((f) => Number.isFinite(f.lat) && Number.isFinite(f.lng));
-    cachedFires = { ts: Date.now(), data: fires, source: src };
-    return { fires, source: src };
+  // Query every available NRT source so offset daytime passes and nighttime VIIRS are captured
+  const sources = ["MODIS_NRT", "VIIRS_SNPP_NRT", "VIIRS_NOAA20_NRT", "VIIRS_NOAA21_NRT"];
+  const results = await Promise.all(
+    sources.map(async (src) => {
+      try {
+        const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${key}/${src}/${bbox}/${dayRange}`;
+        const res = await fetch(url);
+        if (!res.ok) return { src, rows: [] as Record<string, string>[] };
+        const text = await res.text();
+        if (text.startsWith("Invalid") || text.startsWith("No fire") || !text.includes("latitude")) {
+          return { src, rows: [] as Record<string, string>[] };
+        }
+        return { src, rows: parseCsv(text) };
+      } catch {
+        return { src, rows: [] as Record<string, string>[] };
+      }
+    }),
+  );
+
+  const seen = new Set<string>();
+  const fires: FirePoint[] = [];
+  const active: string[] = [];
+  for (const { src, rows } of results) {
+    if (rows.length === 0) continue;
+    active.push(src);
+    const tag = src.replace("_NRT", "");
+    rows.forEach((r, i) => {
+      const lat = Number(r.latitude);
+      const lng = Number(r.longitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+      const dedupeKey = `${lat.toFixed(4)}|${lng.toFixed(4)}|${r.acq_date ?? ""}|${r.acq_time ?? ""}`;
+      if (seen.has(dedupeKey)) return;
+      seen.add(dedupeKey);
+      fires.push({
+        id: `FIRMS-${tag}-${i + 1}`,
+        lat,
+        lng,
+        confidence: confToNum(r.confidence),
+        brightness: Number(r.bright_ti4 ?? r.brightness ?? 0),
+        frp: Number(r.frp ?? 0),
+        acqDate: r.acq_date ?? "",
+        acqTime: r.acq_time ?? "",
+        daynight: (r.daynight as "D" | "N") ?? "D",
+        satellite: r.satellite ?? tag,
+      });
+    });
   }
-  return { fires: [], source: "none" };
+
+  const source = active.length ? active.join(" + ") : "none";
+  cachedFires = { ts: Date.now(), data: fires, source };
+  return { fires, source };
 }
+
 
 // ============================================================
 // Earth Engine — getMapId for tile overlays
