@@ -174,24 +174,29 @@ function confToNum(c: string): number {
 export async function fetchActiveFires(dayRange = 1): Promise<{ fires: FirePoint[]; source: string } | null> {
   const key = process.env.FIRMS_MAP_KEY;
   if (!key) return null;
-  if (cachedFires && Date.now() - cachedFires.ts < 5 * 60_000) {
-    return { fires: cachedFires.data, source: cachedFires.source };
-  }
   const bbox = PUNJAB_BBOX.join(",");
-  // Query every available NRT source so offset daytime passes and nighttime VIIRS are captured
-  const sources = ["MODIS_NRT", "SUOMI_VIIRS_C2", "VIIRS_NOAA20_NRT", "VIIRS_NOAA21_NRT"];
+  // Four separate live requests — one per FIRMS NRT source (MODIS + SUOMI/NOAA-20/NOAA-21 VIIRS).
+  // FIRMS canonical source ids are VIIRS_SNPP_NRT / VIIRS_NOAA20_NRT / VIIRS_NOAA21_NRT.
+  const sources = ["MODIS_NRT", "VIIRS_SNPP_NRT", "VIIRS_NOAA20_NRT", "VIIRS_NOAA21_NRT"];
   const results = await Promise.all(
     sources.map(async (src) => {
       try {
         const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${key}/${src}/${bbox}/${dayRange}`;
-        const res = await fetch(url);
-        if (!res.ok) return { src, rows: [] as Record<string, string>[] };
-        const text = await res.text();
-        if (text.startsWith("Invalid") || text.startsWith("No fire") || !text.includes("latitude")) {
+        const res = await fetch(url, { cache: "no-store" });
+        if (!res.ok) {
+          console.error(`[firms] ${src} HTTP ${res.status}`);
           return { src, rows: [] as Record<string, string>[] };
         }
-        return { src, rows: parseCsv(text) };
-      } catch {
+        const text = await res.text();
+        if (text.startsWith("Invalid") || text.startsWith("No fire") || !text.includes("latitude")) {
+          console.warn(`[firms] ${src} -> ${text.slice(0, 80)}`);
+          return { src, rows: [] as Record<string, string>[] };
+        }
+        const rows = parseCsv(text);
+        console.log(`[firms] ${src} rows=${rows.length}`);
+        return { src, rows };
+      } catch (e) {
+        console.error(`[firms] ${src} failed`, (e as Error).message);
         return { src, rows: [] as Record<string, string>[] };
       }
     }),
