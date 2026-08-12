@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, WMSTileLayer, CircleMarker, GeoJSON, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, CircleMarker, GeoJSON, useMap } from "react-leaflet";
 import * as turf from "@turf/turf";
 import L from "leaflet";
 import { Layers, Flame, Satellite, Sprout, Crosshair, MapPin, X, AlertTriangle, Radio, Radar } from "lucide-react";
@@ -182,21 +182,10 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
           {/* ESA / Copernicus land-cover — above basemap + optical, below FIRMS markers (overlayPane) */}
           {active.has("cropland") && (
             <>
-              {cropTile ? (
+              {cropTile && (
                 <TileLayer url={cropTile.tileUrl} opacity={0.45} maxZoom={19} zIndex={300} />
-              ) : (
-                <WMSTileLayer
-                  url="https://services.terrascope.be/wms/v2"
-                  layers="WORLDCOVER_2021_MAP"
-                  format="image/png"
-                  transparent
-                  version="1.3.0"
-                  opacity={0.42}
-                  attribution="ESA WorldCover 2021 &copy; Terrascope"
-                  zIndex={300}
-                />
               )}
-              {/* Turf-derived urban exclusion zone (Ludhiana metro) — grey mask */}
+              {/* Local Turf-derived urban exclusion zone (Ludhiana metro) — grey mask */}
               <GeoJSON
                 key="ludhiana-urban-mask"
                 data={URBAN_MASK}
