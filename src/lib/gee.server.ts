@@ -179,7 +179,7 @@ export async function fetchActiveFires(dayRange = 1): Promise<{ fires: FirePoint
   }
   const bbox = PUNJAB_BBOX.join(",");
   // Query every available NRT source so offset daytime passes and nighttime VIIRS are captured
-  const sources = ["MODIS_NRT", "VIIRS_SNPP_NRT", "VIIRS_NOAA20_NRT", "VIIRS_NOAA21_NRT"];
+  const sources = ["MODIS_NRT", "SUOMI_VIIRS_C2", "VIIRS_NOAA20_NRT", "VIIRS_NOAA21_NRT"];
   const results = await Promise.all(
     sources.map(async (src) => {
       try {
