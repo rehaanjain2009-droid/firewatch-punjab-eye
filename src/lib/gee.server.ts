@@ -175,61 +175,72 @@ export async function fetchActiveFires(dayRange = 1): Promise<{ fires: FirePoint
   const key = process.env.FIRMS_MAP_KEY;
   if (!key) return null;
   const bbox = PUNJAB_BBOX.join(",");
-  const sources = ["MODIS_NRT", "SUOMI_VIIRS_NRT", "NOAA20_VIIRS_NRT", "NOAA21_VIIRS_NRT"] as const;
+  // Canonical FIRMS source ids (SUOMI_VIIRS_NRT / NOAA20_VIIRS_NRT are rejected with HTTP 400)
+  const sources = ["MODIS_NRT", "VIIRS_SNPP_NRT", "VIIRS_NOAA20_NRT", "VIIRS_NOAA21_NRT"] as const;
 
-  try {
-    const fetchPromises = sources.map(async (src) => {
-      const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${key}/${src}/${bbox}/${dayRange}`;
-      console.log(`[firms] Fetching live source ${src}: https://firms.modaps.eosdis.nasa.gov/api/area/csv/[REDACTED]/${src}/${bbox}/${dayRange}`);
-      const res = await fetch(url, {
-        cache: "no-store",
-        headers: { "Cache-Control": "no-cache, no-store, max-age=0" },
-      });
-      if (!res.ok) throw new Error(`${src} HTTP error! status: ${res.status}`);
-
-      const text = await res.text();
-      if (text.startsWith("Invalid") || (!text.startsWith("No fire") && !text.includes("latitude"))) {
-        throw new Error(`${src} returned an invalid FIRMS response: ${text.slice(0, 120)}`);
-      }
-      const rows = text.startsWith("No fire") ? [] : parseCsv(text);
-      console.log(`[firms] ${src} live rows=${rows.length}`);
-      return { src, rows };
+  const fetchPromises = sources.map(async (src) => {
+    const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${key}/${src}/${bbox}/${dayRange}`;
+    console.log(`[firms] Fetching live source ${src}: .../api/area/csv/[REDACTED]/${src}/${bbox}/${dayRange}`);
+    const res = await fetch(url, {
+      cache: "no-store",
+      headers: { "Cache-Control": "no-cache, no-store, max-age=0" },
     });
+    if (!res.ok) throw new Error(`${src} HTTP error! status: ${res.status}`);
 
-    const results = await Promise.all(fetchPromises);
-    console.log(`[firms] Successfully fetched all 4 satellites in parallel: ${results.map(({ src, rows }) => `${src}=${rows.length}`).join(", ")}`);
-
-    const seen = new Set<string>();
-    const fires: FirePoint[] = [];
-    for (const { src, rows } of results) {
-      const tag = src.replace("_NRT", "");
-      rows.forEach((r, i) => {
-        const lat = Number(r.latitude);
-        const lng = Number(r.longitude);
-        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-        const dedupeKey = `${lat.toFixed(4)}|${lng.toFixed(4)}|${r.acq_date ?? ""}|${r.acq_time ?? ""}`;
-        if (seen.has(dedupeKey)) return;
-        seen.add(dedupeKey);
-        fires.push({
-          id: `FIRMS-${tag}-${i + 1}`,
-          lat,
-          lng,
-          confidence: confToNum(r.confidence),
-          brightness: Number(r.bright_ti4 ?? r.brightness ?? 0),
-          frp: Number(r.frp ?? 0),
-          acqDate: r.acq_date ?? "",
-          acqTime: r.acq_time ?? "",
-          daynight: (r.daynight as "D" | "N") ?? "D",
-          satellite: r.satellite ?? tag,
-        });
-      });
+    const text = await res.text();
+    if (text.startsWith("Invalid") || (!text.startsWith("No fire") && !text.includes("latitude"))) {
+      throw new Error(`${src} returned an invalid FIRMS response: ${text.slice(0, 120)}`);
     }
+    const rows = text.startsWith("No fire") ? [] : parseCsv(text);
+    console.log(`[firms] ${src} live rows=${rows.length}`);
+    return { src, rows };
+  });
 
-    return { fires, source: sources.join(" + ") };
-  } catch (error) {
-    console.error("[firms] NASA API Fetch failed:", error instanceof Error ? error.message : "Unknown error");
+  // allSettled: one bad satellite feed must never blank the whole dispatch board
+  const settled = await Promise.allSettled(fetchPromises);
+  const results: { src: string; rows: Record<string, string>[] }[] = [];
+  const okSources: string[] = [];
+  settled.forEach((r, i) => {
+    if (r.status === "fulfilled") {
+      results.push(r.value);
+      okSources.push(r.value.src);
+    } else {
+      console.error(`[firms] source ${sources[i]} failed:`, r.reason instanceof Error ? r.reason.message : r.reason);
+    }
+  });
+  if (results.length === 0) {
+    console.error("[firms] all NASA FIRMS sources failed");
     return null;
   }
+  console.log(`[firms] live counts: ${results.map(({ src, rows }) => `${src}=${rows.length}`).join(", ")}`);
+
+  const seen = new Set<string>();
+  const fires: FirePoint[] = [];
+  for (const { src, rows } of results) {
+    const tag = src.replace("_NRT", "");
+    rows.forEach((r, i) => {
+      const lat = Number(r.latitude);
+      const lng = Number(r.longitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+      const dedupeKey = `${lat.toFixed(4)}|${lng.toFixed(4)}|${r.acq_date ?? ""}|${r.acq_time ?? ""}`;
+      if (seen.has(dedupeKey)) return;
+      seen.add(dedupeKey);
+      fires.push({
+        id: `FIRMS-${tag}-${i + 1}`,
+        lat,
+        lng,
+        confidence: confToNum(r.confidence),
+        brightness: Number(r.bright_ti4 ?? r.brightness ?? 0),
+        frp: Number(r.frp ?? 0),
+        acqDate: r.acq_date ?? "",
+        acqTime: r.acq_time ?? "",
+        daynight: (r.daynight as "D" | "N") ?? "D",
+        satellite: r.satellite ?? tag,
+      });
+    });
+  }
+
+  return { fires, source: okSources.join(" + ") };
 }
 
 
