@@ -1,7 +1,10 @@
+import { Suspense, lazy } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Satellite, Flame, Paperclip, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import type { LiveFire } from "./MapView";
+
+const BurnScarMiniMap = lazy(() => import("./BurnScarMiniMap").then((m) => ({ default: m.BurnScarMiniMap })));
 
 type Props = {
   fire: LiveFire | null;
@@ -35,49 +38,18 @@ export function BurnScarModal({ fire, open, onOpenChange }: Props) {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {/* Pre-Fire */}
-          <div className="relative overflow-hidden rounded-md border border-border">
-            <div
-              className="aspect-square w-full"
-              style={{
-                background:
-                  "repeating-linear-gradient(45deg, oklch(0.42 0.13 145) 0 14px, oklch(0.36 0.12 148) 14px 28px), radial-gradient(circle at 30% 40%, oklch(0.5 0.15 140) 0 6%, transparent 8%), radial-gradient(circle at 70% 65%, oklch(0.48 0.14 142) 0 5%, transparent 8%)",
-                backgroundBlendMode: "overlay",
-              }}
-            />
-            <div className="absolute inset-0 bg-black/25 flex flex-col justify-between p-2.5">
-              <span className="text-mono text-[10px] font-bold tracking-wider text-white/90 self-start rounded bg-black/50 px-1.5 py-0.5 border border-white/10">
-                PRE-FIRE · NDVI HIGH
-              </span>
-              <div className="flex items-center gap-1.5 text-mono text-[10px] text-white/70">
-                <Loader2 className="h-3 w-3 animate-spin" /> Fetching optical data…
+        <div className="rounded-md border border-border overflow-hidden">
+          <Suspense
+            fallback={(
+              <div className="h-[280px] w-full flex items-center justify-center bg-[oklch(0.215_0.022_252)] text-muted-foreground text-sm">
+                <Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading satellite view…
               </div>
-            </div>
-          </div>
-
-          {/* Post-Fire */}
-          <div className="relative overflow-hidden rounded-md border border-[oklch(0.65_0.24_25/0.5)]">
-            <div
-              className="aspect-square w-full"
-              style={{
-                background:
-                  "repeating-linear-gradient(45deg, oklch(0.22 0.04 40) 0 14px, oklch(0.18 0.03 35) 14px 28px), radial-gradient(circle at 45% 50%, oklch(0.12 0.02 30) 0 22%, transparent 30%), radial-gradient(circle at 60% 55%, oklch(0.08 0.01 25) 0 12%, transparent 22%)",
-                backgroundBlendMode: "multiply",
-              }}
-            />
-            <div className="absolute inset-0 flex flex-col justify-between p-2.5">
-              <span className="text-mono text-[10px] font-bold tracking-wider text-white self-start rounded bg-[oklch(0.65_0.24_25)] px-1.5 py-0.5">
-                POST-FIRE · BURN SCAR
-              </span>
-              <div className="flex items-center gap-1.5 text-mono text-[10px] text-[oklch(0.88_0.17_80)]">
-                <Flame className="h-3 w-3" /> NBR delta detected
-              </div>
-            </div>
-          </div>
+            )}
+          >
+            <BurnScarMiniMap fire={fire} />
+          </Suspense>
         </div>
 
-        {/* Intelligence Overlay */}
         <div className="grid grid-cols-3 gap-2 rounded-md border border-border bg-[oklch(0.215_0.022_252)] p-3">
           <div>
             <div className="text-mono text-[9px] uppercase tracking-wider text-muted-foreground">Est. Burn Area</div>
