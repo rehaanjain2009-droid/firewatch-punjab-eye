@@ -59,7 +59,8 @@ export async function fetchIndustrialAreas(
   north: number,
   east: number,
 ): Promise<{ ok: boolean; reason?: string; features: IndustrialFeature[] }> {
-  const key = [south, west, north, east].map((n) => n.toFixed(2)).join("|");
+  // Include LANDUSE in the cache key so query changes automatically invalidate stale masks.
+  const key = [LANDUSE, south, west, north, east].map((n) => String(n)).join("|");
   const hit = cache.get(key);
   if (hit && Date.now() - hit.ts < TTL_MS) {
     return { ok: true, features: hit.features };
