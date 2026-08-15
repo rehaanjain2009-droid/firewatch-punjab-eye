@@ -23,6 +23,7 @@ const ENDPOINTS = [
 ];
 
 const LANDUSE = "industrial|commercial|retail|residential|construction|brownfield|quarry|landfill|military";
+const QUERY_VERSION = "2"; // bump when the Overpass query changes to invalidate cached masks
 
 function buildQuery(south: number, west: number, north: number, east: number) {
   const bbox = `${south},${west},${north},${east}`;
