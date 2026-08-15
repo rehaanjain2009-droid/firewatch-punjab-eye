@@ -1,6 +1,8 @@
 /**
- * OpenStreetMap Overpass API — real industrial / commercial land-use boundaries.
+ * OpenStreetMap Overpass API — real urban footprint boundaries.
  * Used as the "Urban & Industrial Exclusion" mask replacing the old Turf circle.
+ * Fetches industrial, commercial, residential, retail, construction, brownfield,
+ * quarry, landfill, and military landuse so the entire city sprawl is masked.
  */
 
 export type Ring = [number, number][]; // [lng, lat]
@@ -20,17 +22,19 @@ const ENDPOINTS = [
   "https://overpass.kumi.systems/api/interpreter",
 ];
 
-const LANDUSE = "industrial|commercial|retail|quarry|landfill|military";
+const LANDUSE = "industrial|commercial|retail|residential|construction|brownfield|quarry|landfill|military";
+const QUERY_VERSION = "2"; // bump when the Overpass query changes to invalidate cached masks
 
 function buildQuery(south: number, west: number, north: number, east: number) {
   const bbox = `${south},${west},${north},${east}`;
-  return `[out:json][timeout:40];
+  // Increased output cap so residential/commercial sprawl is fully captured.
+  return `[out:json][timeout:60];
 (
   way["landuse"~"${LANDUSE}"](${bbox});
   relation["landuse"~"${LANDUSE}"](${bbox});
   way["man_made"="works"](${bbox});
 );
-out geom 400;`;
+out geom 2000;`;
 }
 
 type OverpassEl = {
@@ -57,7 +61,8 @@ export async function fetchIndustrialAreas(
   north: number,
   east: number,
 ): Promise<{ ok: boolean; reason?: string; features: IndustrialFeature[] }> {
-  const key = [south, west, north, east].map((n) => n.toFixed(2)).join("|");
+  // Include LANDUSE and a version stamp so query changes automatically invalidate stale masks.
+  const key = [QUERY_VERSION, LANDUSE, south, west, north, east].map((n) => String(n)).join("|");
   const hit = cache.get(key);
   if (hit && Date.now() - hit.ts < TTL_MS) {
     return { ok: true, features: hit.features };

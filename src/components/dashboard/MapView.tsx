@@ -184,10 +184,10 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
               {cropTile && (
                 <TileLayer url={cropTile.tileUrl} opacity={0.45} maxZoom={19} zIndex={300} />
               )}
-              {/* Real OSM industrial / commercial exclusion polygons (Overpass API) */}
+              {/* Real OSM urban-footprint exclusion polygons (Overpass API) */}
               {industrialGeoJson && (
                 <GeoJSON
-                  key={`osm-industrial-${industrialGeoJson.features.length}`}
+                  key={`osm-urban-${industrialGeoJson.features.length}`}
                   data={industrialGeoJson}
                   style={{
                     color: "#94a3b8",
@@ -198,7 +198,7 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
                   onEachFeature={(feature, layer) => {
                     const p = feature.properties as { name?: string; landuse?: string } | null;
                     layer.bindTooltip(
-                      `EXCLUDED · ${(p?.landuse ?? "industrial").toUpperCase()}${p?.name ? ` · ${p.name}` : ""}`,
+                      `EXCLUDED · ${(p?.landuse ?? "urban").toUpperCase()}${p?.name ? ` · ${p.name}` : ""}`,
                       { sticky: true },
                     );
                   }}
