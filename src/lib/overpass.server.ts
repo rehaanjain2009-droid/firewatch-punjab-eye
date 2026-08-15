@@ -1,6 +1,8 @@
 /**
- * OpenStreetMap Overpass API — real industrial / commercial land-use boundaries.
+ * OpenStreetMap Overpass API — real urban footprint boundaries.
  * Used as the "Urban & Industrial Exclusion" mask replacing the old Turf circle.
+ * Fetches industrial, commercial, residential, retail, construction, brownfield,
+ * quarry, landfill, and military landuse so the entire city sprawl is masked.
  */
 
 export type Ring = [number, number][]; // [lng, lat]
@@ -20,7 +22,7 @@ const ENDPOINTS = [
   "https://overpass.kumi.systems/api/interpreter",
 ];
 
-const LANDUSE = "industrial|commercial|retail|quarry|landfill|military";
+const LANDUSE = "industrial|commercial|retail|residential|construction|brownfield|quarry|landfill|military";
 
 function buildQuery(south: number, west: number, north: number, east: number) {
   const bbox = `${south},${west},${north},${east}`;

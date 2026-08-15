@@ -14,9 +14,9 @@ export type IndustrialMask = {
   ready: boolean;
   ok: boolean;
   loading: boolean;
-  /** Real OSM industrial/commercial polygons rendered as the exclusion mask. */
+  /** Real OSM urban-footprint polygons rendered as the exclusion mask. */
   geojson: FeatureCollection<Polygon, { name: string; landuse: string }> | null;
-  /** Fires falling inside an industrial polygon — hidden from the feed/map. */
+  /** Fires falling inside an urban polygon — hidden from the feed/map. */
   suppressedIds: Set<string>;
   /** Which site suppressed a given fire (for tooltips/debug). */
   reasonById: Map<string, string>;
