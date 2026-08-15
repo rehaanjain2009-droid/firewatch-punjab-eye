@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, CircleMarker, GeoJSON, useMap } from "react-leaflet";
-import * as turf from "@turf/turf";
+import type { FeatureCollection, Polygon } from "geojson";
 import L from "leaflet";
 import { Layers, Flame, Satellite, Sprout, Crosshair, MapPin, X, AlertTriangle, Radio, Radar } from "lucide-react";
 
@@ -24,8 +24,6 @@ type Tile = { id: "nbr" | "cropland"; label: string; tileUrl: string };
 const FOCUS: [number, number] = [30.901, 75.857];
 const DEFAULT_ZOOM = 10;
 
-// Ludhiana urban core (non-agricultural) — 9 km radius buffer, [lng, lat] order for Turf
-const URBAN_MASK = turf.circle([75.8573, 30.9010], 9, { steps: 64, units: "kilometers" });
 
 const sevColor = (c: number) => c >= 80 ? "oklch(0.65 0.24 25)" : c >= 60 ? "oklch(0.82 0.17 80)" : "oklch(0.78 0.18 155)";
 const sevHex = (c: number) => c >= 80 ? "#e8473a" : c >= 60 ? "#f0b400" : "#22c08a";
@@ -41,6 +39,7 @@ type Props = {
   diag: Diag;
   maskStatus?: MaskStatus;
   onCroplandToggle?: (active: boolean) => void;
+  industrialGeoJson?: FeatureCollection<Polygon, { name: string; landuse: string }> | null;
 };
 
 function Recenter({ target }: { target: LiveFire | null }) {
@@ -81,7 +80,7 @@ type OverlayDef = {
   badge?: OverlayBadge;
 };
 
-export function MapView({ fires, live, source, tiles, diag, maskStatus = "offline", onCroplandToggle }: Props) {
+export function MapView({ fires, live, source, tiles, diag, maskStatus = "offline", onCroplandToggle, industrialGeoJson = null }: Props) {
   const nbrTile = tiles.find((t) => t.id === "nbr");
   const cropTile = tiles.find((t) => t.id === "cropland");
 
@@ -91,7 +90,7 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
   const overlays: OverlayDef[] = [
     { id: "firms", label: "FIRMS Thermal", icon: Flame, available: true, badge: live ? "LIVE" : undefined },
     { id: "nbr", label: "Sentinel-2 NIR", icon: Satellite, available: true, badge: nbrTile ? "LIVE" : "DEMO IR" },
-    { id: "cropland", label: "ESA Cropland", icon: Sprout, available: true, badge: cropBadge },
+    { id: "cropland", label: "Urban / Industrial Mask", icon: Sprout, available: true, badge: cropBadge },
     { id: "radar", label: "Sentinel-1 Radar", icon: Radar, available: false, badge: "COMING SOON" },
   ];
 
@@ -185,19 +184,27 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
               {cropTile && (
                 <TileLayer url={cropTile.tileUrl} opacity={0.45} maxZoom={19} zIndex={300} />
               )}
-              {/* Local Turf-derived urban exclusion zone (Ludhiana metro) — grey mask */}
-              <GeoJSON
-                key="ludhiana-urban-mask"
-                data={URBAN_MASK}
-                style={{
-                  color: "#94a3b8",
-                  weight: 1.5,
-                  dashArray: "4 3",
-                  fillColor: "#64748b",
-                  fillOpacity: 0.35,
-                }}
-                interactive={false}
-              />
+              {/* Real OSM industrial / commercial exclusion polygons (Overpass API) */}
+              {industrialGeoJson && (
+                <GeoJSON
+                  key={`osm-industrial-${industrialGeoJson.features.length}`}
+                  data={industrialGeoJson}
+                  style={{
+                    color: "#94a3b8",
+                    weight: 1.2,
+                    fillColor: "#64748b",
+                    fillOpacity: 0.4,
+                  }}
+                  onEachFeature={(feature, layer) => {
+                    const p = feature.properties as { name?: string; landuse?: string } | null;
+                    layer.bindTooltip(
+                      `EXCLUDED · ${(p?.landuse ?? "industrial").toUpperCase()}${p?.name ? ` · ${p.name}` : ""}`,
+                      { sticky: true },
+                    );
+                  }}
+                />
+              )}
+
             </>
           )}
 

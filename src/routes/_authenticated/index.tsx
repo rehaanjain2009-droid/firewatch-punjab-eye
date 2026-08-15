@@ -9,6 +9,7 @@ import { OfficerOnboardingModal } from "@/components/dashboard/OfficerOnboarding
 import { getActiveFires, getGeeStatus, getTileLayers } from "@/lib/gee.functions";
 import { getMyProfile } from "@/lib/profile.functions";
 import { useCroplandMask } from "@/hooks/useCroplandMask";
+import { useIndustrialMask } from "@/hooks/useIndustrialMask";
 
 const MapView = lazy(() => import("@/components/dashboard/MapView").then((m) => ({ default: m.MapView })));
 
@@ -99,18 +100,22 @@ function Dashboard() {
   }, [fetchFires, fetchStatus, fetchTiles]);
 
   const mask = useCroplandMask(fires);
+  const industrial = useIndustrialMask(fires);
+  const suppressedIds = useMemo(() => {
+    const s = new Set<string>();
+    if (mask.ready && mask.ok) for (const id of mask.suppressedIds) s.add(id);
+    for (const id of industrial.suppressedIds) s.add(id);
+    return s;
+  }, [mask, industrial]);
   const visibleFires = useMemo(
-    () =>
-      maskEnabled && mask.ready && mask.ok
-        ? fires.filter((f) => !mask.suppressedIds.has(f.id))
-        : fires,
-    [fires, mask, maskEnabled],
+    () => (maskEnabled ? fires.filter((f) => !suppressedIds.has(f.id)) : fires),
+    [fires, suppressedIds, maskEnabled],
   );
   const maskStatus: "live" | "loading" | "offline" = !maskEnabled
     ? "offline"
-    : mask.loading
+    : mask.loading || industrial.loading
       ? "loading"
-      : mask.ready && mask.ok
+      : industrial.ok || (mask.ready && mask.ok)
         ? "live"
         : "offline";
   const outcome = useMemo(() => {
@@ -124,7 +129,7 @@ function Dashboard() {
     return { verified, falseAlarms, pending: visibleFires.length - verified - falseAlarms };
   }, [visibleFires, statuses]);
 
-  const suppressedCount = maskEnabled && mask.ready && mask.ok ? mask.suppressedIds.size : 0;
+  const suppressedCount = maskEnabled ? suppressedIds.size : 0;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -149,6 +154,7 @@ function Dashboard() {
               diag={diag}
               maskStatus={maskStatus}
               onCroplandToggle={setMaskEnabled}
+              industrialGeoJson={industrial.geojson}
             />
           </div>
           <div className="lg:col-span-2 h-[520px] lg:h-[calc(100vh-330px)] lg:min-h-[560px]">
