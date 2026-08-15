@@ -183,19 +183,27 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
               {cropTile && (
                 <TileLayer url={cropTile.tileUrl} opacity={0.45} maxZoom={19} zIndex={300} />
               )}
-              {/* Local Turf-derived urban exclusion zone (Ludhiana metro) — grey mask */}
-              <GeoJSON
-                key="ludhiana-urban-mask"
-                data={URBAN_MASK}
-                style={{
-                  color: "#94a3b8",
-                  weight: 1.5,
-                  dashArray: "4 3",
-                  fillColor: "#64748b",
-                  fillOpacity: 0.35,
-                }}
-                interactive={false}
-              />
+              {/* Real OSM industrial / commercial exclusion polygons (Overpass API) */}
+              {industrialGeoJson && (
+                <GeoJSON
+                  key={`osm-industrial-${industrialGeoJson.features.length}`}
+                  data={industrialGeoJson}
+                  style={{
+                    color: "#94a3b8",
+                    weight: 1.2,
+                    fillColor: "#64748b",
+                    fillOpacity: 0.4,
+                  }}
+                  onEachFeature={(feature, layer) => {
+                    const p = feature.properties as { name?: string; landuse?: string } | null;
+                    layer.bindTooltip(
+                      `EXCLUDED · ${(p?.landuse ?? "industrial").toUpperCase()}${p?.name ? ` · ${p.name}` : ""}`,
+                      { sticky: true },
+                    );
+                  }}
+                />
+              )}
+
             </>
           )}
 
