@@ -26,13 +26,14 @@ const LANDUSE = "industrial|commercial|retail|residential|construction|brownfiel
 
 function buildQuery(south: number, west: number, north: number, east: number) {
   const bbox = `${south},${west},${north},${east}`;
-  return `[out:json][timeout:40];
+  // Increased output cap so residential/commercial sprawl is fully captured.
+  return `[out:json][timeout:60];
 (
   way["landuse"~"${LANDUSE}"](${bbox});
   relation["landuse"~"${LANDUSE}"](${bbox});
   way["man_made"="works"](${bbox});
 );
-out geom 400;`;
+out geom 2000;`;
 }
 
 type OverpassEl = {
