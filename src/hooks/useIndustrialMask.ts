@@ -7,8 +7,9 @@ import type { Feature, FeatureCollection, Polygon } from "geojson";
 import { getIndustrialAreas } from "@/lib/overpass.functions";
 import type { LiveFire } from "@/components/dashboard/MapView";
 
-// Punjab monitoring envelope [S, W, N, E]
-export const PUNJAB_VIEW = { south: 29.5, west: 73.8, north: 32.5, east: 76.9 };
+// Ludhiana monitoring envelope — tight enough for fast Overpass queries but
+// covers the full city sprawl and adjacent agricultural ring [S, W, N, E]
+export const PUNJAB_VIEW = { south: 30.7, west: 75.6, north: 31.15, east: 76.15 };
 
 export type IndustrialMask = {
   ready: boolean;
