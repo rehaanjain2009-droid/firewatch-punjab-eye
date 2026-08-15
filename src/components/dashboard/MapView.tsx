@@ -39,6 +39,7 @@ type Props = {
   diag: Diag;
   maskStatus?: MaskStatus;
   onCroplandToggle?: (active: boolean) => void;
+  industrialGeoJson?: FeatureCollection<Polygon, { name: string; landuse: string }> | null;
 };
 
 function Recenter({ target }: { target: LiveFire | null }) {
@@ -79,7 +80,7 @@ type OverlayDef = {
   badge?: OverlayBadge;
 };
 
-export function MapView({ fires, live, source, tiles, diag, maskStatus = "offline", onCroplandToggle }: Props) {
+export function MapView({ fires, live, source, tiles, diag, maskStatus = "offline", onCroplandToggle, industrialGeoJson = null }: Props) {
   const nbrTile = tiles.find((t) => t.id === "nbr");
   const cropTile = tiles.find((t) => t.id === "cropland");
 
@@ -89,7 +90,7 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
   const overlays: OverlayDef[] = [
     { id: "firms", label: "FIRMS Thermal", icon: Flame, available: true, badge: live ? "LIVE" : undefined },
     { id: "nbr", label: "Sentinel-2 NIR", icon: Satellite, available: true, badge: nbrTile ? "LIVE" : "DEMO IR" },
-    { id: "cropland", label: "ESA Cropland", icon: Sprout, available: true, badge: cropBadge },
+    { id: "cropland", label: "Urban / Industrial Mask", icon: Sprout, available: true, badge: cropBadge },
     { id: "radar", label: "Sentinel-1 Radar", icon: Radar, available: false, badge: "COMING SOON" },
   ];
 
