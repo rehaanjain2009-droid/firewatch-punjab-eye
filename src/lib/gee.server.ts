@@ -133,6 +133,25 @@ export async function diagnoseGee(): Promise<GeeDiagnostic> {
 // Live monitoring focus: Ludhiana / Punjab region
 export const PUNJAB_BBOX = [73.8, 29.5, 76.9, 32.5] as const;
 
+// Strict Ludhiana jurisdiction bounding box for tomorrow's authority presentation.
+// Any thermal anomaly outside these coordinates is discarded before it reaches
+// the dashboard, dispatch feed, or metrics.
+export const LUDHIANA_BBOX = {
+  minLat: 30.70,
+  maxLat: 31.00,
+  minLng: 75.60,
+  maxLng: 76.10,
+} as const;
+
+function isInsideLudhianaBbox(lat: number, lng: number): boolean {
+  return (
+    lat >= LUDHIANA_BBOX.minLat &&
+    lat <= LUDHIANA_BBOX.maxLat &&
+    lng >= LUDHIANA_BBOX.minLng &&
+    lng <= LUDHIANA_BBOX.maxLng
+  );
+}
+
 export type FirePoint = {
   id: string;
   lat: number;
@@ -240,7 +259,11 @@ export async function fetchActiveFires(dayRange = 1): Promise<{ fires: FirePoint
     });
   }
 
-  return { fires, source: okSources.join(" + ") };
+  // Geographic lock: discard any thermal anomaly outside the Ludhiana jurisdiction.
+  const ludhianaFires = fires.filter((f) => isInsideLudhianaBbox(f.lat, f.lng));
+  console.log(`[firms] Ludhiana bbox filter: ${fires.length} -> ${ludhianaFires.length} retained`);
+
+  return { fires: ludhianaFires, source: okSources.join(" + ") };
 }
 
 
