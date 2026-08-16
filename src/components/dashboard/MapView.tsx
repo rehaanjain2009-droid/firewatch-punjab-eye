@@ -63,7 +63,7 @@ function LockToLudhiana() {
       const b = L.latLngBounds(L.latLng(30.70, 75.60), L.latLng(31.00, 76.10));
       const c = map.getCenter();
       const size = map.getSize();
-      const boundsZoom = map.getBoundsZoom(b, false, [0, 0]);
+      const boundsZoom = map.getBoundsZoom(b, false, L.point(0, 0));
       console.log(`[LockToLudhiana] size=${size.x}x${size.y} getBoundsZoom=${boundsZoom}`);
       console.log(`[LockToLudhiana] before fit zoom=${map.getZoom()} center=${c.lat.toFixed(4)},${c.lng.toFixed(4)} bounds=${map.getBounds().toBBoxString()}`);
       console.log(`[LockToLudhiana] target bbox=${b.toBBoxString()}`);
