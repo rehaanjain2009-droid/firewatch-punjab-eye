@@ -179,6 +179,8 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
           worldCopyJump
           zoomSnap={0.1}
           zoomDelta={0.5}
+          maxBounds={LUDHIANA_BOUNDS}
+          maxBoundsViscosity={1.0}
         >
           <LockToLudhiana />
           {/* Base map — always rendered, cannot be toggled off */}
