@@ -61,9 +61,12 @@ function LockToLudhiana() {
     // map container may still be in a transitional portrait size.
     const timer = setTimeout(() => {
       map.invalidateSize();
+      const size = map.getSize();
       const b = L.latLngBounds(L.latLng(30.70, 75.60), L.latLng(31.00, 76.10));
+      console.log(`[LockToLudhiana] delayed size=${size.x}x${size.y} zoom=${map.getZoom()} bounds=${map.getBounds().toBBoxString()}`);
       map.fitBounds(b, { animate: false, padding: [0, 0] });
-    }, 600);
+      console.log(`[LockToLudhiana] after fit zoom=${map.getZoom()} bounds=${map.getBounds().toBBoxString()}`);
+    }, 1200);
     return () => clearTimeout(timer);
   }, [map]);
   return null;
