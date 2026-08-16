@@ -21,8 +21,11 @@ export type LiveFire = {
 type Diag = null | { ok: boolean; step: string; message: string; httpStatus?: number };
 type Tile = { id: "nbr" | "cropland"; label: string; tileUrl: string };
 
-const FOCUS: [number, number] = [30.901, 75.857];
-const DEFAULT_ZOOM = 10;
+// Locked to the Ludhiana jurisdiction bounding box for the authority presentation.
+const LUDHIANA_BOUNDS: [[number, number], [number, number]] = [
+  [30.70, 75.60],
+  [31.00, 76.10],
+];
 
 
 const sevColor = (c: number) => c >= 80 ? "oklch(0.65 0.24 25)" : c >= 60 ? "oklch(0.82 0.17 80)" : "oklch(0.78 0.18 155)";
@@ -50,6 +53,25 @@ function Recenter({ target }: { target: LiveFire | null }) {
   return null;
 }
 
+function LockToLudhiana() {
+  const map = useMap();
+  useEffect(() => {
+    // Hard-lock the initial view to the Ludhiana jurisdiction bounding box.
+    // Defer one frame so the container has its final flex dimensions.
+    requestAnimationFrame(() => {
+      map.invalidateSize();
+      const b = L.latLngBounds(L.latLng(30.70, 75.60), L.latLng(31.00, 76.10));
+      const c = map.getCenter();
+      console.log(`[LockToLudhiana] before fit zoom=${map.getZoom()} center=${c.lat.toFixed(4)},${c.lng.toFixed(4)} bounds=${map.getBounds().toBBoxString()}`);
+      console.log(`[LockToLudhiana] target bbox=${b.toBBoxString()}`);
+      map.fitBounds(b, { animate: false, padding: [0, 0], maxZoom: 12 });
+      const c2 = map.getCenter();
+      console.log(`[LockToLudhiana] after fit zoom=${map.getZoom()} center=${c2.lat.toFixed(4)},${c2.lng.toFixed(4)} bounds=${map.getBounds().toBBoxString()}`);
+    });
+  }, [map]);
+  return null;
+}
+
 function FitToFires({ fires }: { fires: LiveFire[] }) {
   const map = useMap();
   useEffect(() => {
@@ -57,7 +79,11 @@ function FitToFires({ fires }: { fires: LiveFire[] }) {
       .filter((f) => Number.isFinite(f.lat) && Number.isFinite(f.lng))
       .map((f) => [f.lat, f.lng] as [number, number]);
     if (pts.length === 0) {
-      map.setView(FOCUS, DEFAULT_ZOOM, { animate: true });
+      // No fires: keep the view locked to the Ludhiana jurisdiction bounding box.
+      requestAnimationFrame(() => {
+        map.invalidateSize();
+        map.fitBounds(L.latLngBounds(LUDHIANA_BOUNDS), { animate: true, padding: [0, 0] });
+      });
       return;
     }
     if (pts.length === 1) {
@@ -122,7 +148,7 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
         <div className="flex items-center gap-2">
           <Crosshair className="h-4 w-4 text-primary" />
           <h2 className="text-sm font-bold tracking-wide">TACTICAL GIS · LUDHIANA SECTOR</h2>
-          <span className="text-mono text-[10px] text-muted-foreground">30.90°N · 75.86°E</span>
+          <span className="text-mono text-[10px] text-muted-foreground">30.70–31.00°N · 75.60–76.10°E</span>
         </div>
         <div className="flex items-center gap-3 text-mono text-[10px] text-muted-foreground">
           <span className={`flex items-center gap-1.5 rounded px-1.5 py-0.5 border ${live ? "border-[oklch(0.85_0.18_155)/40] text-[oklch(0.85_0.18_155)]" : "border-muted-foreground/20"}`}>
@@ -150,13 +176,12 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
 
       <div className="relative flex-1 overflow-hidden">
         <MapContainer
-          center={FOCUS}
-          zoom={DEFAULT_ZOOM}
           className="absolute inset-0 h-full w-full"
           zoomControl
           attributionControl
           worldCopyJump
         >
+          <LockToLudhiana />
           {/* Base map — always rendered, cannot be toggled off */}
           <TileLayer
             attribution='&copy; OpenStreetMap &copy; CARTO'
@@ -289,7 +314,7 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
 
         {/* Compass */}
         <div className="absolute right-3 bottom-3 panel px-2 py-1.5 text-mono text-[10px] text-muted-foreground z-[1000]">
-          <div className="flex items-center gap-1.5"><Crosshair className="h-3 w-3 text-primary" /> N · 30.90, 75.86 · LUDHIANA</div>
+          <div className="flex items-center gap-1.5"><Crosshair className="h-3 w-3 text-primary" /> N · 30.85, 75.85 · LUDHIANA</div>
         </div>
 
         {!live && fires.length === 0 && (
