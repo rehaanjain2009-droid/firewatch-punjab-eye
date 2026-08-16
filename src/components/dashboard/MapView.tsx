@@ -57,20 +57,14 @@ function LockToLudhiana() {
   const map = useMap();
   useEffect(() => {
     // Hard-lock the initial view to the Ludhiana jurisdiction bounding box.
-    // Defer one frame so the container has its final flex dimensions.
-    requestAnimationFrame(() => {
+    // Wait for the flex/grid layout to settle before fitting, otherwise the
+    // map container may still be in a transitional portrait size.
+    const timer = setTimeout(() => {
       map.invalidateSize();
       const b = L.latLngBounds(L.latLng(30.70, 75.60), L.latLng(31.00, 76.10));
-      const c = map.getCenter();
-      const size = map.getSize();
-      const boundsZoom = map.getBoundsZoom(b, false, L.point(0, 0));
-      console.log(`[LockToLudhiana] size=${size.x}x${size.y} getBoundsZoom=${boundsZoom}`);
-      console.log(`[LockToLudhiana] before fit zoom=${map.getZoom()} center=${c.lat.toFixed(4)},${c.lng.toFixed(4)} bounds=${map.getBounds().toBBoxString()}`);
-      console.log(`[LockToLudhiana] target bbox=${b.toBBoxString()}`);
       map.fitBounds(b, { animate: false, padding: [0, 0] });
-      const c2 = map.getCenter();
-      console.log(`[LockToLudhiana] after fit zoom=${map.getZoom()} center=${c2.lat.toFixed(4)},${c2.lng.toFixed(4)} bounds=${map.getBounds().toBBoxString()}`);
-    });
+    }, 600);
+    return () => clearTimeout(timer);
   }, [map]);
   return null;
 }
