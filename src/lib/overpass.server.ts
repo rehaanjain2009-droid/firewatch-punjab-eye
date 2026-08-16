@@ -22,19 +22,18 @@ const ENDPOINTS = [
   "https://overpass.kumi.systems/api/interpreter",
 ];
 
-const LANDUSE = "industrial|commercial|retail|residential|construction|brownfield|quarry|landfill|military";
-const QUERY_VERSION = "2"; // bump when the Overpass query changes to invalidate cached masks
+const LANDUSE = "industrial|commercial|residential|retail|construction|brownfield|institutional";
+const QUERY_VERSION = "3"; // bump when the Overpass query changes to invalidate cached masks
 
 function buildQuery(south: number, west: number, north: number, east: number) {
+  // Geographic lock: strict Ludhiana-sector bbox only, no data fetched outside it.
   const bbox = `${south},${west},${north},${east}`;
-  // Increased output cap so residential/commercial sprawl is fully captured.
-  return `[out:json][timeout:60];
+  return `[out:json][timeout:45];
 (
-  way["landuse"~"${LANDUSE}"](${bbox});
-  relation["landuse"~"${LANDUSE}"](${bbox});
-  way["man_made"="works"](${bbox});
+  way["landuse"~"^(${LANDUSE})$"](${bbox});
+  relation["landuse"~"^(${LANDUSE})$"](${bbox});
 );
-out geom 2000;`;
+out geom 1500;`;
 }
 
 type OverpassEl = {
