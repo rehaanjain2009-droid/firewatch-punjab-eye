@@ -64,9 +64,13 @@ function LockToLudhiana() {
       const c = map.getCenter();
       console.log(`[LockToLudhiana] before fit zoom=${map.getZoom()} center=${c.lat.toFixed(4)},${c.lng.toFixed(4)} bounds=${map.getBounds().toBBoxString()}`);
       console.log(`[LockToLudhiana] target bbox=${b.toBBoxString()}`);
-      map.fitBounds(b, { animate: false, padding: [0, 0], maxZoom: 12 });
+      // Test if view changes at all
+      map.setView([30.85, 75.85], 12, { animate: false });
       const c2 = map.getCenter();
-      console.log(`[LockToLudhiana] after fit zoom=${map.getZoom()} center=${c2.lat.toFixed(4)},${c2.lng.toFixed(4)} bounds=${map.getBounds().toBBoxString()}`);
+      console.log(`[LockToLudhiana] after setView zoom=${map.getZoom()} center=${c2.lat.toFixed(4)},${c2.lng.toFixed(4)} bounds=${map.getBounds().toBBoxString()}`);
+      map.fitBounds(b, { animate: false, padding: [0, 0], maxZoom: 12 });
+      const c3 = map.getCenter();
+      console.log(`[LockToLudhiana] after fitBounds zoom=${map.getZoom()} center=${c3.lat.toFixed(4)},${c3.lng.toFixed(4)} bounds=${map.getBounds().toBBoxString()}`);
     });
   }, [map]);
   return null;
