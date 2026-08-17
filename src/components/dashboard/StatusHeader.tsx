@@ -41,9 +41,9 @@ function Counter({ icon: Icon, label, value, tone, sub }: { icon: React.Componen
   );
 }
 
-type Props = { outcome?: { verified: number; falseAlarms: number; pending: number }; email?: string | null; telegramHandle?: string | null; dispatchCount?: number; fires?: LiveFire[]; firmsLive?: boolean; suppressedCount?: number; maskReady?: boolean };
+type Props = { outcome?: { verified: number; falseAlarms: number; pending: number }; email?: string | null; telegramHandle?: string | null; dispatchCount?: number; fires?: LiveFire[]; firmsLive?: boolean; suppressedCount?: number; maskReady?: boolean; demoMode?: boolean; onDemoModeChange?: (v: boolean) => void };
 
-export function StatusHeader({ outcome, email, telegramHandle, dispatchCount = 0, fires = [], firmsLive = false, suppressedCount = 0, maskReady = false }: Props = {}) {
+export function StatusHeader({ outcome, email, telegramHandle, dispatchCount = 0, fires = [], firmsLive = false, suppressedCount = 0, maskReady = false, demoMode = false, onDemoModeChange }: Props = {}) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
