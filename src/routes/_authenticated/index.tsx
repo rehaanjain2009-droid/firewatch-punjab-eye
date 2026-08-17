@@ -100,6 +100,14 @@ function Dashboard() {
     return () => { mounted = false; };
   }, [fetchFires, fetchStatus, fetchTiles]);
 
+  const fires = useMemo<LiveFire[]>(
+    () =>
+      demoMode
+        ? DEMO_FIRES.map((f) => ({ ...f, block: nearestBlock(f.lat, f.lng) }))
+        : liveFires,
+    [demoMode, liveFires],
+  );
+
   const mask = useCroplandMask(fires);
   const industrial = useIndustrialMask(fires);
   const suppressedIds = useMemo(() => {
