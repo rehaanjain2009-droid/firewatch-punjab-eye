@@ -10,6 +10,7 @@ import { getActiveFires, getGeeStatus, getTileLayers } from "@/lib/gee.functions
 import { getMyProfile } from "@/lib/profile.functions";
 import { useCroplandMask } from "@/hooks/useCroplandMask";
 import { useIndustrialMask } from "@/hooks/useIndustrialMask";
+import { DEMO_FIRES } from "@/lib/demo-fires";
 
 const MapView = lazy(() => import("@/components/dashboard/MapView").then((m) => ({ default: m.MapView })));
 
