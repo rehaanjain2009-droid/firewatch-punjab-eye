@@ -92,7 +92,27 @@ export function StatusHeader({ outcome, email, telegramHandle, dispatchCount = 0
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-sm font-bold tracking-wide text-foreground">PPF · COMMAND & CONTROL</h1>
-                <Pill tone="emerald"><span className="h-1.5 w-1.5 rounded-full bg-current ticker" />OPERATIONAL</Pill>
+                {demoMode ? (
+                  <Pill tone="amber"><span className="h-1.5 w-1.5 rounded-full bg-current ticker" />SIMULATED DATA</Pill>
+                ) : (
+                  <Pill tone="emerald"><span className="h-1.5 w-1.5 rounded-full bg-current ticker" />OPERATIONAL</Pill>
+                )}
+                <label
+                  className={`text-mono inline-flex cursor-pointer items-center gap-2 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
+                    demoMode
+                      ? "border-[oklch(0.82_0.17_80/0.5)] bg-[oklch(0.82_0.17_80/0.14)] text-[oklch(0.88_0.17_80)] glow-amber"
+                      : "border-border bg-accent/40 text-muted-foreground hover:border-primary/40"
+                  }`}
+                >
+                  <FlaskConical className="h-3 w-3" />
+                  Demo Mode
+                  <Switch
+                    checked={demoMode}
+                    onCheckedChange={(v) => onDemoModeChange?.(v)}
+                    aria-label="Toggle demo mode"
+                    className="h-4 w-7 [&>span]:h-3 [&>span]:w-3 data-[state=checked]:bg-[oklch(0.82_0.17_80)]"
+                  />
+                </label>
               </div>
               <p className="text-[11px] text-muted-foreground text-mono">
                 Punjab Pollution Control · Stubble & Wildfire Intelligence Grid · Ludhiana Sector
