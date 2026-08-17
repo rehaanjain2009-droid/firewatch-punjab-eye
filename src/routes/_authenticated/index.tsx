@@ -160,8 +160,8 @@ function Dashboard() {
           <div className="lg:col-span-3 h-[520px] lg:h-[calc(100vh-330px)] lg:min-h-[560px]">
             <ClientMapView
               fires={visibleFires}
-              live={firesLive}
-              source={firesSource}
+              live={demoMode || firesLive}
+              source={demoMode ? "DEMO · SIMULATED" : firesSource}
               tiles={tiles}
               diag={diag}
               maskStatus={maskStatus}
