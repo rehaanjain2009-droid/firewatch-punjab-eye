@@ -148,10 +148,12 @@ function Dashboard() {
         telegramHandle={profile?.telegram_handle ?? null}
         dispatchCount={dispatchCount}
         fires={visibleFires}
-        firmsLive={firesLive}
+        firmsLive={demoMode || firesLive}
         suppressedCount={suppressedCount}
-        maskReady={maskEnabled && mask.ready && mask.ok}
+        maskReady={maskEnabled && (demoMode ? industrial.ok : mask.ready && mask.ok)}
         outcome={outcome}
+        demoMode={demoMode}
+        onDemoModeChange={setDemoMode}
       />
       <main className="mx-auto max-w-[1600px] px-5 py-4 space-y-4">
         <section className="grid gap-4 lg:grid-cols-5">
