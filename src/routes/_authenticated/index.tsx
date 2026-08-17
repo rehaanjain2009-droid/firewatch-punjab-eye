@@ -172,7 +172,7 @@ function Dashboard() {
           <div className="lg:col-span-2 h-[520px] lg:h-[calc(100vh-330px)] lg:min-h-[560px]">
             <DispatchFeed
               fires={visibleFires}
-              live={firesLive}
+              live={demoMode || firesLive}
               places={mask.places}
               statuses={statuses}
               onStatusChange={(id, status) => setStatuses((s) => ({ ...s, [id]: status }))}
