@@ -92,7 +92,7 @@ function Dashboard() {
       const enriched: LiveFire[] = r.fires
         .filter((f) => Number.isFinite(f.lat) && Number.isFinite(f.lng))
         .map((f) => ({ ...f, block: nearestBlock(f.lat, f.lng) }));
-      setFires(enriched);
+      setLiveFires(enriched);
       setFiresLive(r.live);
       setFiresSource(r.source);
     }).catch(() => {});
