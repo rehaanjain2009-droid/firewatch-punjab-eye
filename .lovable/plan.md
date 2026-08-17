@@ -1,52 +1,46 @@
-# Fix: Cropland mask wiping the map
+# Demo Mode for the Ludhiana dashboard
 
-## Root cause
+Add a stakeholder-facing DEMO MODE switch that injects three historical Ludhiana
+detections so the map, dispatch feed, metrics, and urban-mask filtering all show
+activity even when today's live NASA feed is empty.
 
-In `src/hooks/useCroplandMask.ts` the rule is *"suppress unless explicitly cropland (WorldCover = 40) AND not in urban polygon"*. Any fire whose GEE point sample returns `null`, times out, or is classified as anything other than `40` (trees, shrub, grassland, bare, etc.) is dropped. With the current FIRMS payload most points land on mixed or non-cropland pixels and the map goes blank.
+## What gets built
 
-Coordinate order in the existing code (`point([lng, lat])`) is actually correct, but we'll harden it and log it per the user's request.
+1. **Header toggle** — a clearly visible DEMO MODE switch in the top status
+   header, right next to the OPERATIONAL badge. When ON it shows an amber
+   "SIMULATED DATA" state so nobody mistakes it for live intelligence.
 
-## Changes
+2. **Mock detections** — three fixed Ludhiana fires (the factory fire at
+   30.908/75.811, plus 30.850/75.950 and 30.880/75.830), dated 2023-11-05 with
+   the given FRP, confidence, times, and satellites.
 
-### 1. `src/hooks/useCroplandMask.ts` — invert the rule
-Replace the "must be cropland" gate with an "only suppress on confirmed urban/built" gate:
+3. **Seamless swap** — turning Demo Mode ON bypasses the live fetch and renders
+   the three fires on the Leaflet map and Dispatch Feed identically to live data
+   (routing, Telegram dispatch, burn-scar verification, hourly chart, KPI
+   counters). Turning it OFF clears simulated state and restores the live
+   (currently empty) feed.
 
-- Suppress a fire **only when** one of the following is true:
-  - `inUrban(lat, lng) === true` (inside the Ludhiana urban polygon), OR
-  - `landCover` is a **confirmed built/water class**: `50` (built-up), `80` (water). Anything else (including `null`, `undefined`, `30` grassland, `40` cropland, classification errors) → keep the fire.
-- Per-fire debug log:
-  ```ts
-  console.debug('[cropland-mask]', {
-    id, firmsCoords: [lat, lng], turfCoords: [lng, lat],
-    landCover: lc, urban, suppressed,
-  });
-  ```
-- Keep the `LUDHIANA_URBAN` polygon (already within the requested 74.5–76.5 E / 30.0–31.5 N envelope: 75.78–75.94 E, 30.85–30.96 N). Add an assertion comment documenting the lng-first ring order so it can't be flipped by a future edit.
-- Helper `toTurfCoord(lat, lng): [number, number]` returns `[lng, lat]`; use it everywhere Turf is called.
+4. **Filter demonstration** — the OpenStreetMap urban-mask + Turf.js
+   point-in-polygon filter runs on the simulated fires, so sim-1 inside the
+   urban/industrial footprint gets suppressed and counted under "Urban Fires
+   Detected", proving the filter live on stage.
 
-### 2. `src/lib/cropland.server.ts` — keep behavior, document fallback
-No logic change required, but add a code comment that `landCover: null` means "unknown / API failure, do NOT suppress". The client now respects that.
+## Technical notes
 
-### 3. `src/routes/_authenticated/index.tsx` — safe default
-Currently: `visibleFires = maskEnabled && mask.ready && mask.ok ? fires.filter(...) : fires`. The filter call uses `croplandIds`, which under the new rule will be "all fires minus confirmed urban/water". Switch the derivation to use the new `suppressedIds` directly:
-
-```ts
-const visibleFires = maskEnabled && mask.ready && mask.ok
-  ? fires.filter(f => !mask.suppressedIds.has(f.id))
-  : fires;
-```
-
-This guarantees: classification error → fire stays visible; only positively-identified urban/water gets hidden.
-
-### 4. Hook return shape
-`CroplandMask` keeps the same shape; `croplandIds` becomes "fires positively kept" (informational), `suppressedIds` is the single source of truth for hiding.
-
-### 5. Debug log toggle
-Logs gated behind `if (import.meta.env.DEV)` so production stays quiet, but visible in the user's browser console during this audit.
-
-## Files touched
-- edited: `src/hooks/useCroplandMask.ts`
-- edited: `src/routes/_authenticated/index.tsx`
-- edited: `src/lib/cropland.server.ts` (comment only)
-
-No new dependencies, no backend or schema changes.
+- New `src/lib/demo-fires.ts`: exports a `DEMO_FIRES` array already mapped to the
+  existing `LiveFire` shape (`lat`, `lng`, numeric `confidence` via the same
+  h/n/l mapping used server-side, `brightness`, `daynight` derived from
+  `acq_time`, `satellite`). `block` is filled by the existing `nearestBlock()`
+  helper in the dashboard route so nothing downstream changes.
+- `src/routes/_authenticated/index.tsx`: add `demoMode` state (default OFF).
+  Derive the working fire array as `demoMode ? DEMO_FIRES : liveFires` and feed
+  that single array into `useCroplandMask`, `useIndustrialMask`, `visibleFires`,
+  `StatusHeader`, `MapView`, `DispatchFeed`, and `HourlyChart` — so masking and
+  metrics are automatically exercised on the simulated set. The live fetch effect
+  stays untouched; its results are simply not used while demo mode is on.
+- `src/components/dashboard/StatusHeader.tsx`: accept `demoMode` and
+  `onDemoModeChange` props and render the toggle (shadcn `Switch` with a small
+  uppercase label, styled with existing tactical tokens) beside the OPERATIONAL
+  pill; swap that pill to an amber "SIMULATED" variant while demo mode is active.
+- No backend, database, or server-function changes; nothing is written to the
+  live NASA path or Telegram cron.
