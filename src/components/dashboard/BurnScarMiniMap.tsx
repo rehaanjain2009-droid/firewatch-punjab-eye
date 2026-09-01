@@ -4,6 +4,7 @@ import type { LiveFire } from "./MapView";
 
 type Props = {
   fire: LiveFire;
+  tileUrl?: string;
 };
 
 function Recenter({ center }: { center: LatLngExpression }) {
@@ -12,7 +13,7 @@ function Recenter({ center }: { center: LatLngExpression }) {
   return null;
 }
 
-export function BurnScarMiniMap({ fire }: Props) {
+export function BurnScarMiniMap({ fire, tileUrl }: Props) {
   const center: LatLngExpression = [fire.lat, fire.lng];
   const radius = Math.max(12, Math.min(60, (fire.frp ?? 0) * 0.8));
 
@@ -25,8 +26,13 @@ export function BurnScarMiniMap({ fire }: Props) {
     >
       <Recenter center={center} />
       <TileLayer
-        attribution="&copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community"
-        url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+        url={
+          tileUrl ??
+          "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+        }
+        subdomains={["a", "b", "c", "d"]}
+        maxZoom={19}
       />
       <CircleMarker
         center={center}

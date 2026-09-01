@@ -31,6 +31,7 @@ type Props = {
   places?: Map<string, PlaceInfo>;
   statuses?: Record<string, FireStatus>;
   onStatusChange?: (id: string, status: FireStatus) => void;
+  tileUrl?: string;
 };
 
 const STATUS_OPTIONS: { key: FireStatus; label: string; cls: string }[] = [
@@ -39,7 +40,7 @@ const STATUS_OPTIONS: { key: FireStatus; label: string; cls: string }[] = [
   { key: "false_alarm", label: "False Alarm", cls: "bg-[oklch(0.82_0.17_80/0.18)] text-[oklch(0.88_0.17_80)] border-[oklch(0.82_0.17_80/0.5)]" },
 ];
 
-export function DispatchFeed({ fires, live, onDispatched, places, statuses, onStatusChange }: Props) {
+export function DispatchFeed({ fires, live, onDispatched, places, statuses, onStatusChange, tileUrl }: Props) {
 
   const [copied, setCopied] = useState<string | null>(null);
   const [dispatched, setDispatched] = useState<Set<string>>(new Set());
@@ -221,7 +222,7 @@ export function DispatchFeed({ fires, live, onDispatched, places, statuses, onSt
           );
         })}
       </div>
-      <BurnScarModal fire={verifyFire} open={!!verifyFire} onOpenChange={(o) => !o && setVerifyFire(null)} />
+      <BurnScarModal fire={verifyFire} open={!!verifyFire} onOpenChange={(o) => !o && setVerifyFire(null)} tileUrl={tileUrl} />
     </div>
   );
 }

@@ -10,9 +10,10 @@ type Props = {
   fire: LiveFire | null;
   open: boolean;
   onOpenChange: (o: boolean) => void;
+  tileUrl?: string;
 };
 
-export function BurnScarModal({ fire, open, onOpenChange }: Props) {
+export function BurnScarModal({ fire, open, onOpenChange, tileUrl }: Props) {
   if (!fire) return null;
 
   const hectares = Math.max(0.3, fire.frp * 0.5).toFixed(1);
@@ -46,7 +47,7 @@ export function BurnScarModal({ fire, open, onOpenChange }: Props) {
               </div>
             )}
           >
-            <BurnScarMiniMap fire={fire} />
+            <BurnScarMiniMap fire={fire} tileUrl={tileUrl} />
           </Suspense>
         </div>
 
