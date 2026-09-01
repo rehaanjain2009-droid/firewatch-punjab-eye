@@ -196,8 +196,9 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
               <TileLayer url={nbrTile.tileUrl} opacity={0.85} maxZoom={19} zIndex={200} />
             ) : (
               <TileLayer
-                attribution='Imagery &copy; Esri · Sentinel-2 fallback'
-                url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+                url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+                subdomains={["a", "b", "c", "d"]}
                 opacity={0.9}
                 maxZoom={19}
                 zIndex={200}

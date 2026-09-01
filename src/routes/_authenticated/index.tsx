@@ -140,6 +140,7 @@ function Dashboard() {
   }, [visibleFires, statuses]);
 
   const suppressedCount = maskEnabled ? suppressedIds.size : 0;
+  const nbrTile = useMemo(() => tiles.find((t) => t.id === "nbr")?.tileUrl, [tiles]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -177,6 +178,7 @@ function Dashboard() {
               statuses={statuses}
               onStatusChange={(id, status) => setStatuses((s) => ({ ...s, [id]: status }))}
               onDispatched={() => setDispatchCount((c) => c + 1)}
+              tileUrl={nbrTile}
             />
           </div>
         </section>
