@@ -185,9 +185,8 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
           <LockToLudhiana />
           {/* Base map — always rendered, cannot be toggled off */}
           <TileLayer
-            attribution='&copy; OpenStreetMap &copy; CARTO'
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-            subdomains={["a", "b", "c", "d"]}
+            attribution='Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ'
+            url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
             maxZoom={19}
           />
           {/* Sentinel-2 optical — above basemap, below cropland + FIRMS */}
@@ -196,9 +195,8 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
               <TileLayer url={nbrTile.tileUrl} opacity={0.85} maxZoom={19} zIndex={200} />
             ) : (
               <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-                url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-                subdomains={["a", "b", "c", "d"]}
+                attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
                 opacity={0.9}
                 maxZoom={19}
                 zIndex={200}
