@@ -14,7 +14,7 @@ type Raw = {
 const RAW: Raw[] = [
   // sim-1 is deliberately placed inside the Focal Point industrial belt southeast of Ludhiana
   // so that the urban / industrial mask suppresses it during Demo Mode.
-  { id: "sim-1", latitude: 30.85, longitude: 75.94, frp: 7.2, confidence: "h", acq_date: "2023-11-05", acq_time: "1400", source: "VIIRS_SNPP_NRT" },
+  { id: "sim-1", latitude: 30.886, longitude: 75.915, frp: 7.2, confidence: "h", acq_date: "2023-11-05", acq_time: "1400", source: "VIIRS_SNPP_NRT" },
   { id: "sim-2", latitude: 30.850, longitude: 75.950, frp: 12.5, confidence: "h", acq_date: "2023-11-05", acq_time: "1415", source: "MODIS_NRT" },
   { id: "sim-3", latitude: 30.880, longitude: 75.830, frp: 3.4, confidence: "n", acq_date: "2023-11-05", acq_time: "1430", source: "NOAA20_VIIRS_NRT" },
 ];
