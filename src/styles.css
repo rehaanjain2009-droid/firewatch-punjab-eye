@@ -1,11 +1,12 @@
-/* Preserve OpenStreetMap street detail while matching the tactical dark interface. */
-.tactical-dark-basemap {
-  filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
-}
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
 @import "leaflet/dist/leaflet.css";
+
+/* Preserve OpenStreetMap street detail while matching the tactical dark interface. */
+.tactical-dark-basemap {
+  filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+}
 
 @custom-variant dark (&:is(.dark *));
 
