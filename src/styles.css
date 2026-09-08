@@ -1,3 +1,7 @@
+/* Preserve OpenStreetMap street detail while matching the tactical dark interface. */
+.tactical-dark-basemap {
+  filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+}
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
