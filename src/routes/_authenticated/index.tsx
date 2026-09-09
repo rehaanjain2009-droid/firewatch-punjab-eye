@@ -10,7 +10,6 @@ import { getActiveFires, getGeeStatus, getTileLayers } from "@/lib/gee.functions
 import { getMyProfile } from "@/lib/profile.functions";
 import { useCroplandMask } from "@/hooks/useCroplandMask";
 import { useIndustrialMask } from "@/hooks/useIndustrialMask";
-import { DEMO_FIRES } from "@/lib/demo-fires";
 
 const MapView = lazy(() => import("@/components/dashboard/MapView").then((m) => ({ default: m.MapView })));
 
@@ -73,7 +72,6 @@ function ClientMapView(props: React.ComponentProps<typeof MapView>) {
 function Dashboard() {
   const { profile } = Route.useLoaderData();
   const [liveFires, setLiveFires] = useState<LiveFire[]>([]);
-  const [demoMode, setDemoMode] = useState(false);
   const [dispatchCount, setDispatchCount] = useState(0);
   const [firesLive, setFiresLive] = useState(false);
   const [firesSource, setFiresSource] = useState<string>("");
@@ -101,13 +99,7 @@ function Dashboard() {
     return () => { mounted = false; };
   }, [fetchFires, fetchStatus, fetchTiles]);
 
-  const fires = useMemo<LiveFire[]>(
-    () =>
-      demoMode
-        ? DEMO_FIRES.map((f) => ({ ...f, block: nearestBlock(f.lat, f.lng) }))
-        : liveFires,
-    [demoMode, liveFires],
-  );
+  const fires = liveFires;
 
   const mask = useCroplandMask(fires);
   const industrial = useIndustrialMask(fires);
@@ -149,20 +141,18 @@ function Dashboard() {
         telegramHandle={profile?.telegram_handle ?? null}
         dispatchCount={dispatchCount}
         fires={visibleFires}
-        firmsLive={demoMode || firesLive}
+        firmsLive={firesLive}
         suppressedCount={suppressedCount}
-        maskReady={maskEnabled && (demoMode ? industrial.ok : mask.ready && mask.ok)}
+        maskReady={maskEnabled && (mask.ready && mask.ok || industrial.ok)}
         outcome={outcome}
-        demoMode={demoMode}
-        onDemoModeChange={setDemoMode}
       />
       <main className="mx-auto max-w-[1600px] px-5 py-4 space-y-4">
         <section className="grid gap-4 lg:grid-cols-5">
           <div className="lg:col-span-3 h-[520px] lg:h-[calc(100vh-330px)] lg:min-h-[560px]">
             <ClientMapView
               fires={visibleFires}
-              live={demoMode || firesLive}
-              source={demoMode ? "DEMO · SIMULATED" : firesSource}
+              live={firesLive}
+              source={firesSource}
               tiles={tiles}
               diag={diag}
               maskStatus={maskStatus}
@@ -173,7 +163,7 @@ function Dashboard() {
           <div className="lg:col-span-2 h-[520px] lg:h-[calc(100vh-330px)] lg:min-h-[560px]">
             <DispatchFeed
               fires={visibleFires}
-              live={demoMode || firesLive}
+                live={firesLive}
               places={mask.places}
               statuses={statuses}
               onStatusChange={(id, status) => setStatuses((s) => ({ ...s, [id]: status }))}
