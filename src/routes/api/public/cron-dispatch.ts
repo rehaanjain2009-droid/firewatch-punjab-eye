@@ -1,57 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { booleanPointInPolygon, point, polygon } from "@turf/turf";
 import { fetchActiveFires } from "@/lib/gee.server";
 import { isDispatched, markDispatched, pruneDedup, sendTelegram } from "@/lib/telegram.server";
+import { loadWardCollection, computeWardMask } from "@/lib/wardMask";
 
-// Ludhiana urban core polygon — MUST match src/hooks/useCroplandMask.ts.
-// GeoJSON ring convention: [lng, lat]. NASA FIRMS gives lat first; flip before
-// handing coordinates to Turf. Envelope: 75.78–75.94 E, 30.85–30.96 N.
-const LUDHIANA_URBAN = polygon([
-  [
-    [75.78, 30.85],
-    [75.94, 30.85],
-    [75.94, 30.96],
-    [75.78, 30.96],
-    [75.78, 30.85],
-  ],
-]);
-
-function isUrbanFire(lat: number, lng: number): boolean {
-  return booleanPointInPolygon(point([lng, lat]), LUDHIANA_URBAN);
-}
-
-const BLOCKS: { name: string; lat: number; lng: number }[] = [
-  { name: "Ludhiana", lat: 30.9010, lng: 75.8573 },
-  { name: "Jalandhar", lat: 31.3260, lng: 75.5762 },
-  { name: "Khanna", lat: 30.7040, lng: 76.2176 },
-  { name: "Moga", lat: 30.8160, lng: 75.1720 },
-  { name: "Sangrur", lat: 30.2430, lng: 75.8400 },
-  { name: "Patiala", lat: 30.3398, lng: 76.3869 },
-  { name: "Amritsar", lat: 31.6340, lng: 74.8723 },
-  { name: "Bathinda", lat: 30.2110, lng: 74.9455 },
-  { name: "Ferozepur", lat: 30.9330, lng: 74.6160 },
-  { name: "Barnala", lat: 30.3700, lng: 75.5500 },
-  { name: "Fazilka", lat: 30.4040, lng: 74.0280 },
-  { name: "Hoshiarpur", lat: 31.5200, lng: 75.9800 },
-  { name: "Kapurthala", lat: 31.3800, lng: 75.3800 },
-  { name: "Rupnagar", lat: 30.9700, lng: 76.5300 },
-  { name: "Nawanshahr", lat: 31.1200, lng: 76.1300 },
-];
-
-function nearestBlock(lat: number, lng: number): string {
-  let best = BLOCKS[0];
-  let bestD = Infinity;
-  for (const b of BLOCKS) {
-    const d = (b.lat - lat) ** 2 + (b.lng - lng) ** 2;
-    if (d < bestD) {
-      bestD = d;
-      best = b;
-    }
-  }
-  return best.name;
-}
-
-const MIN_CONFIDENCE = 70;
+const MIN_CONFIDENCE = 70; // dispatch strictly ABOVE this value (VIIRS "h" -> 90)
 const MAX_PER_RUN = 10;
 
 export const Route = createFileRoute("/api/public/cron-dispatch")({
@@ -84,12 +36,16 @@ async function handle(request: Request) {
     return Response.json({ ok: false, error: "FIRMS_MAP_KEY not configured" }, { status: 500 });
   }
 
-  // Step 2 — Geospatial mask: drop any fire that lands inside the Ludhiana
-  // urban polygon before we spend a DB/Telegram call on it.
+  // Step 2 — Strict spatial mask against the official MC Ludhiana ward
+  // boundaries (LDH_MC_Boundary_Wards). Any fire inside a ward polygon is
+  // urban/industrial and is dropped before a DB/Telegram call is spent on it.
+  const wards = await loadWardCollection();
+  const { suppressedIds } = computeWardMask(data.fires, wards);
+
   const agricultural: typeof data.fires = [];
   let suppressedUrban = 0;
   for (const f of data.fires) {
-    if (isUrbanFire(f.lat, f.lng)) {
+    if (suppressedIds.has(f.id)) {
       suppressedUrban++;
       continue;
     }
@@ -97,7 +53,7 @@ async function handle(request: Request) {
   }
 
   const candidates = agricultural
-    .filter((f) => f.confidence >= MIN_CONFIDENCE && !isDispatched(f))
+    .filter((f) => f.confidence > MIN_CONFIDENCE && !isDispatched(f))
     .sort((a, b) => b.confidence - a.confidence)
     .slice(0, MAX_PER_RUN);
 
@@ -121,10 +77,42 @@ async function handle(request: Request) {
     ok: true,
     scanned: data.fires.length,
     suppressedUrban,
+    wardPolygons: wards.features.length,
     agricultural: agricultural.length,
     source: data.source,
-    threshold: MIN_CONFIDENCE,
+    threshold: `> ${MIN_CONFIDENCE}%`,
     dispatched: results.filter((r) => r.ok).length,
     results,
   });
+}
+
+const BLOCKS: { name: string; lat: number; lng: number }[] = [
+  { name: "Ludhiana", lat: 30.9010, lng: 75.8573 },
+  { name: "Jalandhar", lat: 31.3260, lng: 75.5762 },
+  { name: "Khanna", lat: 30.7040, lng: 76.2176 },
+  { name: "Moga", lat: 30.8160, lng: 75.1720 },
+  { name: "Sangrur", lat: 30.2430, lng: 75.8400 },
+  { name: "Patiala", lat: 30.3398, lng: 76.3869 },
+  { name: "Amritsar", lat: 31.6340, lng: 74.8723 },
+  { name: "Bathinda", lat: 30.2110, lng: 74.9455 },
+  { name: "Ferozepur", lat: 30.9330, lng: 74.6160 },
+  { name: "Barnala", lat: 30.3700, lng: 75.5500 },
+  { name: "Fazilka", lat: 30.4040, lng: 74.0280 },
+  { name: "Hoshiarpur", lat: 31.5200, lng: 75.9800 },
+  { name: "Kapurthala", lat: 31.3800, lng: 75.3800 },
+  { name: "Rupnagar", lat: 30.9700, lng: 76.5300 },
+  { name: "Nawanshahr", lat: 31.1200, lng: 76.1300 },
+];
+
+function nearestBlock(lat: number, lng: number): string {
+  let best = BLOCKS[0];
+  let bestD = Infinity;
+  for (const b of BLOCKS) {
+    const d = (b.lat - lat) ** 2 + (b.lng - lng) ** 2;
+    if (d < bestD) {
+      bestD = d;
+      best = b;
+    }
+  }
+  return best.name;
 }

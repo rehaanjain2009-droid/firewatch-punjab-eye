@@ -53,7 +53,7 @@ export function DispatchFeed({ fires, live, onDispatched, places, statuses, onSt
   const sendDispatch = useServerFn(dispatchTelegram);
 
   const sorted = useMemo(() => [...fires].sort((a, b) => (b.frp || 0) - (a.frp || 0)), [fires]);
-  const unhandled = sorted.filter((f) => !dispatched.has(f.id) && !acked.has(f.id)).length;
+  const unhandled = sorted.filter((f) => !dispatched.has(f.id) && !autoDispatched?.has(f.id) && !acked.has(f.id)).length;
 
   const gmapsUrl = (f: LiveFire): string | null => {
     if (!Number.isFinite(f.lat) || !Number.isFinite(f.lng)) return null;
