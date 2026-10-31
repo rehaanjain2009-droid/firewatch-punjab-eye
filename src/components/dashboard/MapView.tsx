@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, CircleMarker, GeoJSON, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, CircleMarker, GeoJSON, Tooltip, useMap } from "react-leaflet";
 import type { FeatureCollection, Polygon } from "geojson";
 import L from "leaflet";
 import { Layers, Flame, Satellite, Sprout, Crosshair, MapPin, X, AlertTriangle, Radio, Radar } from "lucide-react";
+import type { WardCollection, WardProps } from "@/hooks/useWardMask";
 
 export type LiveFire = {
   id: string;
@@ -43,6 +44,12 @@ type Props = {
   maskStatus?: MaskStatus;
   onCroplandToggle?: (active: boolean) => void;
   industrialGeoJson?: FeatureCollection<Polygon, { name: string; landuse: string }> | null;
+  /** Official MC Ludhiana ward polygons (urban / industrial mask). */
+  wardGeoJson?: WardCollection | null;
+  wardCount?: number;
+  /** Fires inside ward/cropland/industrial masks — rendered grey, not dispatched. */
+  suppressedIds?: Set<string>;
+  wardById?: Map<string, string>;
 };
 
 function Recenter({ target }: { target: LiveFire | null }) {
@@ -103,7 +110,7 @@ type OverlayDef = {
   badge?: OverlayBadge;
 };
 
-export function MapView({ fires, live, source, tiles, diag, maskStatus = "offline", onCroplandToggle, industrialGeoJson = null }: Props) {
+export function MapView({ fires, live, source, tiles, diag, maskStatus = "offline", onCroplandToggle, industrialGeoJson = null, wardGeoJson = null, wardCount = 0, suppressedIds, wardById }: Props) {
   const nbrTile = tiles.find((t) => t.id === "nbr");
   const cropTile = tiles.find((t) => t.id === "cropland");
 
