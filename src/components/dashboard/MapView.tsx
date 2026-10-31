@@ -245,7 +245,7 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
                   }}
                 />
               )}
-              {/* Exact OSM industrial / brick-kiln / commercial / residential polygons */}
+              {/* Exact OSM industrial / brick-kiln polygons */}
               {industrialGeoJson && (
                 <GeoJSON
                   key={`osm-landuse-${industrialGeoJson.features.length}`}
