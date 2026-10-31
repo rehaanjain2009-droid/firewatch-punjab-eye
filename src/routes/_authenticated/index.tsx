@@ -31,6 +31,10 @@ export const Route = createFileRoute("/_authenticated/")({
     meta: [
       { title: "PPF Command & Control · Ludhiana Stubble Fire Intelligence" },
       { name: "description", content: "Punjab Pollution Control tactical dashboard for real-time NASA FIRMS detections, Sentinel-2 burn-scar overlays, and field dispatch across the Ludhiana sector." },
+      { property: "og:title", content: "PPF Command & Control · Ludhiana Stubble Fire Intelligence" },
+      { property: "og:description", content: "Live stubble fire detections, officer assignment and Telegram dispatch for the Ludhiana sector." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
 });
