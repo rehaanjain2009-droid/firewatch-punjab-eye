@@ -270,8 +270,10 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
 
 
           {active.has("firms") && fires.map((f) => {
-            const c = sevHex(f.confidence);
+            const isSuppressed = suppressedIds?.has(f.id) ?? false;
+            const c = isSuppressed ? "#6b7280" : sevHex(f.confidence);
             const isSel = selected?.id === f.id;
+            const wardLabel = wardById?.get(f.id);
             return (
               <CircleMarker
                 key={f.id}
@@ -280,12 +282,21 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
                 pathOptions={{
                   color: c,
                   fillColor: c,
-                  fillOpacity: 0.85,
+                  fillOpacity: isSuppressed ? 0.55 : 0.85,
                   weight: isSel ? 3 : 2,
                   opacity: 1,
+                  dashArray: isSuppressed ? "2 3" : undefined,
                 }}
                 eventHandlers={{ click: () => handlePick(f) }}
-              />
+              >
+                <Tooltip direction="top" offset={[0, -6]} opacity={0.95}>
+                  <span className="text-mono text-[10px]">
+                    {isSuppressed
+                      ? `SUPPRESSED · Urban${wardLabel ? ` · ${wardLabel}` : ""}`
+                      : "ACTIVE · Dispatch candidate"}
+                  </span>
+                </Tooltip>
+              </CircleMarker>
             );
           })}
 
