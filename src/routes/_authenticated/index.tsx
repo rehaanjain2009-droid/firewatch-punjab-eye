@@ -103,23 +103,30 @@ function Dashboard() {
 
   const fires = liveFires;
 
+  // Reverse-geocoded place labels only (e.g. "Farmland near Jagraon") — never suppresses.
   const mask = useCroplandMask(fires);
   const industrial = useIndustrialMask(fires);
   const ward = useWardMask(fires);
 
-  // Strict spatial masking: MC ward boundaries ALWAYS suppress (urban /
-  // industrial land). Cropland + Overpass industrial masks honor the map toggle.
+  // A fire is suppressed ONLY when it lies inside an exact OSM industrial /
+  // brick-kiln / commercial / residential polygon, or inside the MC Ludhiana
+  // ward core. Farmland, forest and all other land stay active. The map's
+  // mask toggle only hides the overlay — suppression always applies, matching
+  // the hourly cron route.
   const suppressedIds = useMemo(() => {
     const s = new Set<string>();
     for (const id of ward.suppressedIds) s.add(id);
-    if (maskEnabled) {
-      if (mask.ready && mask.ok) for (const id of mask.suppressedIds) s.add(id);
-      for (const id of industrial.suppressedIds) s.add(id);
-    }
+    for (const id of industrial.suppressedIds) s.add(id);
     return s;
-  }, [ward, mask, industrial, maskEnabled]);
+  }, [ward, industrial]);
 
-  // Only fires OUTSIDE all ward boundaries remain "active" dispatch candidates.
+  const reasonById = useMemo(() => {
+    const m = new Map<string, string>(industrial.reasonById);
+    for (const [id, label] of ward.wardById) m.set(id, `MC ${label}`);
+    return m;
+  }, [ward, industrial]);
+
+  // Only fires outside every mask remain "active" dispatch candidates.
   const activeFires = useMemo(
     () => fires.filter((f) => !suppressedIds.has(f.id)),
     [fires, suppressedIds],
@@ -127,9 +134,9 @@ function Dashboard() {
 
   const maskStatus: "live" | "loading" | "offline" = !maskEnabled
     ? "offline"
-    : ward.loading || mask.loading || industrial.loading
+    : ward.loading || industrial.loading
       ? "loading"
-      : ward.ready || industrial.ok || (mask.ready && mask.ok)
+      : ward.ready || industrial.ok
         ? "live"
         : "offline";
 
