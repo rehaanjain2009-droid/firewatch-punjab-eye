@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { diagnoseGee, fetchActiveFires, fetchTileLayers } from "./gee.server";
-import { sendTelegram } from "./telegram.server";
+import { dispatchIncident, loadOfficerDirectory } from "./incidents.server";
 
 export const getGeeStatus = createServerFn({ method: "GET" }).handler(async () => {
   const diag = await diagnoseGee();
@@ -35,12 +35,17 @@ const DispatchSchema = z.object({
   acqDate: z.string().min(1).max(20),
   acqTime: z.string().max(8),
   satellite: z.string().min(1).max(60),
+  daynight: z.string().max(2).optional(),
+  channel: z.enum(["manual", "auto_dashboard"]).default("manual"),
+  /** Manual "Force" re-sends even if the incident was already dispatched. */
+  force: z.boolean().default(false),
 });
 
 export const dispatchTelegram = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => DispatchSchema.parse(input))
-  .handler(async ({ data }) => {
-    const result = await sendTelegram(data);
-    return result;
+  .handler(async ({ data, context }) => {
+    const { channel, force, ...fire } = data;
+    const directory = await loadOfficerDirectory(context.supabase);
+    return dispatchIncident(context.supabase, fire, channel, force, directory);
   });
