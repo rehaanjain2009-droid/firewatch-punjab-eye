@@ -32,6 +32,8 @@ type Props = {
   statuses?: Record<string, FireStatus>;
   onStatusChange?: (id: string, status: FireStatus) => void;
   tileUrl?: string;
+  /** Fires already pushed automatically by the >70% confidence trigger. */
+  autoDispatched?: Set<string>;
 };
 
 const STATUS_OPTIONS: { key: FireStatus; label: string; cls: string }[] = [
@@ -40,7 +42,7 @@ const STATUS_OPTIONS: { key: FireStatus; label: string; cls: string }[] = [
   { key: "false_alarm", label: "False Alarm", cls: "bg-[oklch(0.82_0.17_80/0.18)] text-[oklch(0.88_0.17_80)] border-[oklch(0.82_0.17_80/0.5)]" },
 ];
 
-export function DispatchFeed({ fires, live, onDispatched, places, statuses, onStatusChange, tileUrl }: Props) {
+export function DispatchFeed({ fires, live, onDispatched, places, statuses, onStatusChange, tileUrl, autoDispatched }: Props) {
 
   const [copied, setCopied] = useState<string | null>(null);
   const [dispatched, setDispatched] = useState<Set<string>>(new Set());
@@ -51,7 +53,7 @@ export function DispatchFeed({ fires, live, onDispatched, places, statuses, onSt
   const sendDispatch = useServerFn(dispatchTelegram);
 
   const sorted = useMemo(() => [...fires].sort((a, b) => (b.frp || 0) - (a.frp || 0)), [fires]);
-  const unhandled = sorted.filter((f) => !dispatched.has(f.id) && !acked.has(f.id)).length;
+  const unhandled = sorted.filter((f) => !dispatched.has(f.id) && !autoDispatched?.has(f.id) && !acked.has(f.id)).length;
 
   const gmapsUrl = (f: LiveFire): string | null => {
     if (!Number.isFinite(f.lat) || !Number.isFinite(f.lng)) return null;
@@ -67,7 +69,7 @@ export function DispatchFeed({ fires, live, onDispatched, places, statuses, onSt
   };
 
   const handleDispatch = async (f: LiveFire) => {
-    if (sending.has(f.id) || dispatched.has(f.id)) return;
+    if (sending.has(f.id) || dispatched.has(f.id) || autoDispatched?.has(f.id)) return;
     setSending((s) => new Set(s).add(f.id));
     setErrors((e) => { const n = { ...e }; delete n[f.id]; return n; });
     try {
@@ -120,7 +122,7 @@ export function DispatchFeed({ fires, live, onDispatched, places, statuses, onSt
         )}
         {sorted.map((f) => {
           const t = confTone(f.confidence);
-          const isDispatched = dispatched.has(f.id);
+          const isDispatched = dispatched.has(f.id) || (autoDispatched?.has(f.id) ?? false);
           const isAcked = acked.has(f.id);
           const evasion = evasionTag(f.acqTime);
           const status = isDispatched ? "dispatched" : isAcked ? "ack" : "new";

@@ -9,20 +9,20 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
-import { Route as ApiPublicGeeDebugRouteImport } from './routes/api/public/gee-debug'
 import { Route as ApiPublicCronDispatchRouteImport } from './routes/api/public/cron-dispatch'
+import { Route as ApiPublicGeeDebugRouteImport } from './routes/api/public/gee-debug'
 
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
-  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
@@ -35,14 +35,14 @@ const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
   path: '/onboarding',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const ApiPublicGeeDebugRoute = ApiPublicGeeDebugRouteImport.update({
-  id: '/api/public/gee-debug',
-  path: '/api/public/gee-debug',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiPublicCronDispatchRoute = ApiPublicCronDispatchRouteImport.update({
   id: '/api/public/cron-dispatch',
   path: '/api/public/cron-dispatch',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicGeeDebugRoute = ApiPublicGeeDebugRouteImport.update({
+  id: '/api/public/gee-debug',
+  path: '/api/public/gee-debug',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -103,18 +103,18 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/_authenticated': {
       id: '/_authenticated'
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/': {
@@ -131,18 +131,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/api/public/gee-debug': {
-      id: '/api/public/gee-debug'
-      path: '/api/public/gee-debug'
-      fullPath: '/api/public/gee-debug'
-      preLoaderRoute: typeof ApiPublicGeeDebugRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/public/cron-dispatch': {
       id: '/api/public/cron-dispatch'
       path: '/api/public/cron-dispatch'
       fullPath: '/api/public/cron-dispatch'
       preLoaderRoute: typeof ApiPublicCronDispatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/gee-debug': {
+      id: '/api/public/gee-debug'
+      path: '/api/public/gee-debug'
+      fullPath: '/api/public/gee-debug'
+      preLoaderRoute: typeof ApiPublicGeeDebugRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
