@@ -78,49 +78,6 @@ async function handle(request: Request) {
     results.push({ lat: f.lat, lng: f.lng, confidence: f.confidence, ok: r.ok, status: r.status, skipped: r.skipped });
   }
 
-  return Response.json({ ok: false, error: "FIRMS_MAP_KEY not configured" }, { status: 500 });
-  }
-
-  // Step 2 — Suppress ONLY fires inside the MC Ludhiana ward core or an exact
-  // OSM industrial / brick-kiln polygon. Farmland and villages stay active.
-  const [wards, osm] = await Promise.all([
-    loadWardCollection(),
-    fetchIndustrialAreas(OSM_MASK_BBOX.south, OSM_MASK_BBOX.west, OSM_MASK_BBOX.north, OSM_MASK_BBOX.east),
-  ]);
-  const wardMask = computeWardMask(data.fires, wards);
-  const osmMask = computeLanduseMask(data.fires, osm.features);
-
-  const agricultural: typeof data.fires = [];
-  let suppressedUrban = 0;
-  for (const f of data.fires) {
-    if (wardMask.suppressedIds.has(f.id) || osmMask.suppressedIds.has(f.id)) {
-      suppressedUrban++;
-      continue;
-    }
-    agricultural.push(f);
-  }
-
-  const candidates = agricultural
-    .filter((f) => shouldAutoDispatch(f.confidence) && !isDispatched(f))
-    .sort((a, b) => b.confidence - a.confidence)
-    .slice(0, MAX_PER_RUN);
-
-  const results: { lat: number; lng: number; confidence: number; ok: boolean; status: number }[] = [];
-  for (const f of candidates) {
-    const r = await sendTelegram({
-      block: nearestBlock(f.lat, f.lng),
-      lat: f.lat,
-      lng: f.lng,
-      confidence: f.confidence,
-      frp: f.frp,
-      acqDate: f.acqDate,
-      acqTime: f.acqTime,
-      satellite: f.satellite,
-    });
-    if (r.ok) markDispatched(f);
-    results.push({ lat: f.lat, lng: f.lng, confidence: f.confidence, ok: r.ok, status: r.status });
-  }
-
   return Response.json({
     ok: true,
     scanned: data.fires.length,
@@ -129,11 +86,11 @@ async function handle(request: Request) {
     osmPolygons: osm.features.length,
     osmMaskOk: osm.ok,
     agricultural: agricultural.length,
+    officersLocated: directory.length,
     source: data.source,
     threshold: `>= ${DISPATCH_MIN_CONFIDENCE}%`,
     dispatched: results.filter((r) => r.ok && !r.skipped).length,
     alreadyDispatched: results.filter((r) => r.skipped).length,
-    officersLocated: directory.length,
     results,
   });
 }
