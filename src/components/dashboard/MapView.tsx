@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, CircleMarker, GeoJSON, Tooltip, useMap } from 
 import type { FeatureCollection, Polygon } from "geojson";
 import L from "leaflet";
 import { Layers, Flame, Satellite, Sprout, Crosshair, MapPin, X, AlertTriangle, Radio, Radar } from "lucide-react";
-import type { WardCollection, WardProps } from "@/hooks/useWardMask";
+import type { WardCollection, WardProps } from "@/lib/wardMask";
 
 export type LiveFire = {
   id: string;

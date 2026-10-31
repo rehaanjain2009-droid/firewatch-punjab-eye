@@ -33,7 +33,7 @@ export function useWardMask(fires: LiveFire[]): WardMask {
     if (import.meta.env.DEV && wards) {
       for (const f of wards.features) {
         try {
-          polygon(f.geometry.coordinates as [number, number][]);
+          polygon(f.geometry.coordinates);
         } catch {
           // eslint-disable-next-line no-console
           console.warn("[ward-mask] malformed ward ring", f.properties);
