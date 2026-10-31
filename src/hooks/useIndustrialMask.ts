@@ -1,24 +1,20 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import booleanPointInPolygon from "@turf/boolean-point-in-polygon";
-import { point, polygon } from "@turf/helpers";
-import type { Feature, FeatureCollection, Polygon } from "geojson";
+import type { FeatureCollection, Polygon } from "geojson";
 import { getIndustrialAreas } from "@/lib/overpass.functions";
+import { computeLanduseMask, OSM_MASK_BBOX, type MaskKind } from "@/lib/landuseMask";
 import type { LiveFire } from "@/components/dashboard/MapView";
 
-// Geographic lock: strict Ludhiana city sector [S, W, N, E]. Nothing outside is fetched.
-export const PUNJAB_VIEW = { south: 30.85, west: 75.75, north: 30.95, east: 75.95 };
-
 export type IndustrialMask = {
+  /** True once the Overpass lookup has finished (successfully or not). */
   ready: boolean;
   ok: boolean;
   loading: boolean;
-  /** Real OSM urban-footprint polygons rendered as the exclusion mask. */
-  geojson: FeatureCollection<Polygon, { name: string; landuse: string }> | null;
-  /** Fires falling inside an urban polygon — hidden from the feed/map. */
+  /** Exact OSM industrial / brick-kiln / commercial / residential polygons. */
+  geojson: FeatureCollection<Polygon, { name: string; landuse: MaskKind }> | null;
+  /** Fires inside one of those polygons — suppressed. */
   suppressedIds: Set<string>;
-  /** Which site suppressed a given fire (for tooltips/debug). */
   reasonById: Map<string, string>;
   count: number;
 };
@@ -27,54 +23,22 @@ export function useIndustrialMask(fires: LiveFire[]): IndustrialMask {
   const fetchAreas = useServerFn(getIndustrialAreas);
 
   const query = useQuery({
-    queryKey: ["overpass-industrial", PUNJAB_VIEW],
+    queryKey: ["overpass-landuse-v4", OSM_MASK_BBOX],
     staleTime: 6 * 60 * 60_000,
-    queryFn: () => fetchAreas({ data: PUNJAB_VIEW }),
+    retry: 1,
+    queryFn: () => fetchAreas({ data: { ...OSM_MASK_BBOX } }),
   });
 
   return useMemo<IndustrialMask>(() => {
-    const feats: Feature<Polygon, { name: string; landuse: string }>[] = [];
-    for (const f of query.data?.features ?? []) {
-      try {
-        feats.push(
-          polygon([f.ring as [number, number][]], { name: f.name, landuse: f.landuse }) as Feature<
-            Polygon,
-            { name: string; landuse: string }
-          >,
-        );
-      } catch {
-        // skip malformed ring
-      }
-    }
-
-    const suppressedIds = new Set<string>();
-    const reasonById = new Map<string, string>();
-
-    for (const fire of fires) {
-      // Turf expects [lng, lat]
-      const pt = point([fire.lng, fire.lat]);
-      for (const poly of feats) {
-        if (booleanPointInPolygon(pt, poly)) {
-          suppressedIds.add(fire.id);
-          reasonById.set(fire.id, `${poly.properties.landuse} · ${poly.properties.name}`);
-          break;
-        }
-      }
-    }
-
+    const { suppressedIds, reasonById, polygons } = computeLanduseMask(fires, query.data?.features ?? []);
     return {
       ready: !query.isLoading,
       ok: Boolean(query.data?.ok),
       loading: query.isLoading || query.isFetching,
-      geojson: feats.length
-        ? ({ type: "FeatureCollection", features: feats } as FeatureCollection<
-            Polygon,
-            { name: string; landuse: string }
-          >)
-        : null,
+      geojson: polygons.length ? { type: "FeatureCollection", features: polygons } : null,
       suppressedIds,
       reasonById,
-      count: feats.length,
+      count: polygons.length,
     };
   }, [fires, query.data, query.isLoading, query.isFetching]);
 }
