@@ -44,12 +44,12 @@ type Props = {
   maskStatus?: MaskStatus;
   onCroplandToggle?: (active: boolean) => void;
   industrialGeoJson?: FeatureCollection<Polygon, { name: string; landuse: string }> | null;
-  /** fire id -> suppression reason (MC ward or OSM class) for tooltips. */
-  /** Official MC Ludhiana ward polygons (urban / industrial mask). */
+  /** Official MC Ludhiana ward polygons (inner urban core mask). */
   wardGeoJson?: WardCollection | null;
   wardCount?: number;
-  /** Fires inside ward/cropland/industrial masks — rendered grey, not dispatched. */
+  /** Fires inside the ward core or an OSM built-up polygon — rendered grey, not dispatched. */
   suppressedIds?: Set<string>;
+  /** fire id -> suppression reason (MC ward or OSM class) for tooltips. */
   wardById?: Map<string, string>;
 };
 
