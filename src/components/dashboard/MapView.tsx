@@ -399,6 +399,11 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
               <div className="rounded bg-accent/40 px-2 py-1.5"><div className="text-[9px] uppercase tracking-wider text-muted-foreground">FRP</div><div className="text-foreground">{selected.frp.toFixed(1)} MW</div></div>
               <div className="rounded bg-accent/40 px-2 py-1.5"><div className="text-[9px] uppercase tracking-wider text-muted-foreground">Acquired</div><div className="text-foreground">{selected.acqDate} {selected.acqTime}</div></div>
             </div>
+            {suppressedIds?.has(selected.id) && (
+              <div className="mt-2 text-mono text-[10px] text-[oklch(0.88_0.17_80)]">
+                ● SUPPRESSED · Urban mask{wardById?.get(selected.id) ? ` · ${wardById.get(selected.id)}` : ""}
+              </div>
+            )}
             <a
               href={`https://www.google.com/maps/search/?api=1&query=${selected.lat.toFixed(6)},${selected.lng.toFixed(6)}`}
               target="_blank" rel="noreferrer"
