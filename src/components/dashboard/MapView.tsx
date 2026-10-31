@@ -163,6 +163,13 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
             <span className={`h-1.5 w-1.5 rounded-full ${tiles.length ? "bg-[oklch(0.85_0.18_155)] shadow-[0_0_8px_currentColor]" : "bg-muted-foreground/40"}`} />
             GEE TILES · {tiles.length}/2
           </span>
+          <span
+            className={`flex items-center gap-1.5 rounded px-1.5 py-0.5 border ${wardCount ? "border-[#2c5282] text-[#90cdf4] bg-[#2b6cb0]/15" : "border-muted-foreground/20"}`}
+            data-testid="ward-zone-counter"
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${wardCount ? "bg-[#90cdf4] shadow-[0_0_8px_currentColor]" : "bg-muted-foreground/40"}`} />
+            ACTIVE WARD ZONES · {wardCount}
+          </span>
         </div>
       </div>
 
@@ -216,6 +223,26 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
             <>
               {cropTile && (
                 <TileLayer url={cropTile.tileUrl} opacity={0.45} maxZoom={19} zIndex={300} />
+              )}
+              {/* Official MC Ludhiana ward boundaries — urban / industrial exclusion mask */}
+              {wardGeoJson && wardGeoJson.features.length > 0 && (
+                <GeoJSON
+                  key={`mc-wards-${wardGeoJson.features.length}`}
+                  data={wardGeoJson}
+                  style={{
+                    color: "#2c5282",
+                    weight: 1,
+                    fillColor: "#2b6cb0",
+                    fillOpacity: 0.35,
+                  }}
+                  onEachFeature={(feature, layer) => {
+                    const p = feature.properties as WardProps | null;
+                    layer.bindTooltip(
+                      `MC WARD ${p?.ward || p?.ward_no || "?"} · Urban/Industrial Mask`,
+                      { sticky: true },
+                    );
+                  }}
+                />
               )}
               {/* Real OSM urban-footprint exclusion polygons (Overpass API) */}
               {industrialGeoJson && (
