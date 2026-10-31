@@ -33,6 +33,13 @@ describe("OSM tag classification", () => {
     expect(classifyOsmTags({ landuse: "farmland" })).toBeNull();
     expect(classifyOsmTags({ landuse: "forest" })).toBeNull();
   });
+  it("industrial land suppresses", () => {
+    expect(classifyOsmTags({ landuse: "industrial" })).toBe("industrial");
+  });
+  it("rural village residential / commercial tags never suppress", () => {
+    expect(classifyOsmTags({ landuse: "residential" })).toBeNull();
+    expect(classifyOsmTags({ landuse: "commercial" })).toBeNull();
+  });
 });
 
 describe("computeLanduseMask", () => {
