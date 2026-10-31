@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, CircleMarker, GeoJSON, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, CircleMarker, GeoJSON, Tooltip, useMap } from "react-leaflet";
 import type { FeatureCollection, Polygon } from "geojson";
 import L from "leaflet";
 import { Layers, Flame, Satellite, Sprout, Crosshair, MapPin, X, AlertTriangle, Radio, Radar } from "lucide-react";
+import type { WardCollection, WardProps } from "@/hooks/useWardMask";
 
 export type LiveFire = {
   id: string;
@@ -43,6 +44,12 @@ type Props = {
   maskStatus?: MaskStatus;
   onCroplandToggle?: (active: boolean) => void;
   industrialGeoJson?: FeatureCollection<Polygon, { name: string; landuse: string }> | null;
+  /** Official MC Ludhiana ward polygons (urban / industrial mask). */
+  wardGeoJson?: WardCollection | null;
+  wardCount?: number;
+  /** Fires inside ward/cropland/industrial masks — rendered grey, not dispatched. */
+  suppressedIds?: Set<string>;
+  wardById?: Map<string, string>;
 };
 
 function Recenter({ target }: { target: LiveFire | null }) {
@@ -103,7 +110,7 @@ type OverlayDef = {
   badge?: OverlayBadge;
 };
 
-export function MapView({ fires, live, source, tiles, diag, maskStatus = "offline", onCroplandToggle, industrialGeoJson = null }: Props) {
+export function MapView({ fires, live, source, tiles, diag, maskStatus = "offline", onCroplandToggle, industrialGeoJson = null, wardGeoJson = null, wardCount = 0, suppressedIds, wardById }: Props) {
   const nbrTile = tiles.find((t) => t.id === "nbr");
   const cropTile = tiles.find((t) => t.id === "cropland");
 
@@ -155,6 +162,13 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
           <span className={`flex items-center gap-1.5 rounded px-1.5 py-0.5 border ${tiles.length ? "border-[oklch(0.85_0.18_155)/40] text-[oklch(0.85_0.18_155)]" : "border-muted-foreground/20"}`}>
             <span className={`h-1.5 w-1.5 rounded-full ${tiles.length ? "bg-[oklch(0.85_0.18_155)] shadow-[0_0_8px_currentColor]" : "bg-muted-foreground/40"}`} />
             GEE TILES · {tiles.length}/2
+          </span>
+          <span
+            className={`flex items-center gap-1.5 rounded px-1.5 py-0.5 border ${wardCount ? "border-[#2c5282] text-[#90cdf4] bg-[#2b6cb0]/15" : "border-muted-foreground/20"}`}
+            data-testid="ward-zone-counter"
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${wardCount ? "bg-[#90cdf4] shadow-[0_0_8px_currentColor]" : "bg-muted-foreground/40"}`} />
+            ACTIVE WARD ZONES · {wardCount}
           </span>
         </div>
       </div>
@@ -210,6 +224,26 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
               {cropTile && (
                 <TileLayer url={cropTile.tileUrl} opacity={0.45} maxZoom={19} zIndex={300} />
               )}
+              {/* Official MC Ludhiana ward boundaries — urban / industrial exclusion mask */}
+              {wardGeoJson && wardGeoJson.features.length > 0 && (
+                <GeoJSON
+                  key={`mc-wards-${wardGeoJson.features.length}`}
+                  data={wardGeoJson}
+                  style={{
+                    color: "#2c5282",
+                    weight: 1,
+                    fillColor: "#2b6cb0",
+                    fillOpacity: 0.35,
+                  }}
+                  onEachFeature={(feature, layer) => {
+                    const p = feature.properties as WardProps | null;
+                    layer.bindTooltip(
+                      `MC WARD ${p?.ward || p?.ward_no || "?"} · Urban/Industrial Mask`,
+                      { sticky: true },
+                    );
+                  }}
+                />
+              )}
               {/* Real OSM urban-footprint exclusion polygons (Overpass API) */}
               {industrialGeoJson && (
                 <GeoJSON
@@ -236,8 +270,10 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
 
 
           {active.has("firms") && fires.map((f) => {
-            const c = sevHex(f.confidence);
+            const isSuppressed = suppressedIds?.has(f.id) ?? false;
+            const c = isSuppressed ? "#6b7280" : sevHex(f.confidence);
             const isSel = selected?.id === f.id;
+            const wardLabel = wardById?.get(f.id);
             return (
               <CircleMarker
                 key={f.id}
@@ -246,12 +282,21 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
                 pathOptions={{
                   color: c,
                   fillColor: c,
-                  fillOpacity: 0.85,
+                  fillOpacity: isSuppressed ? 0.55 : 0.85,
                   weight: isSel ? 3 : 2,
                   opacity: 1,
+                  dashArray: isSuppressed ? "2 3" : undefined,
                 }}
                 eventHandlers={{ click: () => handlePick(f) }}
-              />
+              >
+                <Tooltip direction="top" offset={[0, -6]} opacity={0.95}>
+                  <span className="text-mono text-[10px]">
+                    {isSuppressed
+                      ? `SUPPRESSED · Urban${wardLabel ? ` · ${wardLabel}` : ""}`
+                      : "ACTIVE · Dispatch candidate"}
+                  </span>
+                </Tooltip>
+              </CircleMarker>
             );
           })}
 
@@ -354,6 +399,11 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
               <div className="rounded bg-accent/40 px-2 py-1.5"><div className="text-[9px] uppercase tracking-wider text-muted-foreground">FRP</div><div className="text-foreground">{selected.frp.toFixed(1)} MW</div></div>
               <div className="rounded bg-accent/40 px-2 py-1.5"><div className="text-[9px] uppercase tracking-wider text-muted-foreground">Acquired</div><div className="text-foreground">{selected.acqDate} {selected.acqTime}</div></div>
             </div>
+            {suppressedIds?.has(selected.id) && (
+              <div className="mt-2 text-mono text-[10px] text-[oklch(0.88_0.17_80)]">
+                ● SUPPRESSED · Urban mask{wardById?.get(selected.id) ? ` · ${wardById.get(selected.id)}` : ""}
+              </div>
+            )}
             <a
               href={`https://www.google.com/maps/search/?api=1&query=${selected.lat.toFixed(6)},${selected.lng.toFixed(6)}`}
               target="_blank" rel="noreferrer"
