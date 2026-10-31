@@ -44,6 +44,7 @@ type Props = {
   maskStatus?: MaskStatus;
   onCroplandToggle?: (active: boolean) => void;
   industrialGeoJson?: FeatureCollection<Polygon, { name: string; landuse: string }> | null;
+  /** fire id -> suppression reason (MC ward or OSM class) for tooltips. */
   /** Official MC Ludhiana ward polygons (urban / industrial mask). */
   wardGeoJson?: WardCollection | null;
   wardCount?: number;
@@ -224,7 +225,7 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
               {cropTile && (
                 <TileLayer url={cropTile.tileUrl} opacity={0.45} maxZoom={19} zIndex={300} />
               )}
-              {/* Official MC Ludhiana ward boundaries — urban / industrial exclusion mask */}
+              {/* Official MC Ludhiana ward boundaries — inner urban core only */}
               {wardGeoJson && wardGeoJson.features.length > 0 && (
                 <GeoJSON
                   key={`mc-wards-${wardGeoJson.features.length}`}
@@ -233,32 +234,32 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
                     color: "#2c5282",
                     weight: 1,
                     fillColor: "#2b6cb0",
-                    fillOpacity: 0.35,
+                    fillOpacity: 0.2,
                   }}
                   onEachFeature={(feature, layer) => {
                     const p = feature.properties as WardProps | null;
                     layer.bindTooltip(
-                      `MC WARD ${p?.ward || p?.ward_no || "?"} · Urban/Industrial Mask`,
+                      `MC WARD ${p?.ward || p?.ward_no || "?"} · Urban core`,
                       { sticky: true },
                     );
                   }}
                 />
               )}
-              {/* Real OSM urban-footprint exclusion polygons (Overpass API) */}
+              {/* Exact OSM industrial / brick-kiln / commercial / residential polygons */}
               {industrialGeoJson && (
                 <GeoJSON
-                  key={`osm-urban-${industrialGeoJson.features.length}`}
+                  key={`osm-landuse-${industrialGeoJson.features.length}`}
                   data={industrialGeoJson}
-                  style={{
-                    color: "#94a3b8",
-                    weight: 1.2,
-                    fillColor: "#64748b",
-                    fillOpacity: 0.4,
+                  style={(feature) => {
+                    const kind = (feature?.properties as { landuse?: string } | undefined)?.landuse;
+                    return kind === "industrial" || kind === "brick_kiln"
+                      ? { color: "#dd6b20", weight: 1.4, fillColor: "#dd6b20", fillOpacity: 0.25 }
+                      : { color: "#3182ce", weight: 0.8, fillColor: "#2b6cb0", fillOpacity: 0.2 };
                   }}
                   onEachFeature={(feature, layer) => {
                     const p = feature.properties as { name?: string; landuse?: string } | null;
                     layer.bindTooltip(
-                      `EXCLUDED · ${(p?.landuse ?? "urban").toUpperCase()}${p?.name ? ` · ${p.name}` : ""}`,
+                      `MASKED · ${(p?.landuse ?? "built-up").replace("_", " ").toUpperCase()}${p?.name ? ` · ${p.name}` : ""}`,
                       { sticky: true },
                     );
                   }}
@@ -292,7 +293,7 @@ export function MapView({ fires, live, source, tiles, diag, maskStatus = "offlin
                 <Tooltip direction="top" offset={[0, -6]} opacity={0.95}>
                   <span className="text-mono text-[10px]">
                     {isSuppressed
-                      ? `SUPPRESSED · Urban${wardLabel ? ` · ${wardLabel}` : ""}`
+                      ? `SUPPRESSED${wardLabel ? ` · ${wardLabel}` : " · Built-up"}`
                       : "ACTIVE · Dispatch candidate"}
                   </span>
                 </Tooltip>
