@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { Activity, Flame, Zap, ShieldCheck, Truck, ShieldAlert, Radio, LogOut, User, Send } from "lucide-react";
+import { Activity, Flame, Zap, ShieldCheck, Truck, ShieldAlert, Radio, LogOut, User, Send, ScrollText, LayoutDashboard } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { TELEGRAM_DISPATCH_URL } from "@/components/dashboard/OfficerOnboardingModal";
 import type { LiveFire } from "@/components/dashboard/MapView";
@@ -108,6 +108,23 @@ export function StatusHeader({ outcome, email, telegramHandle, dispatchCount = 0
               </span>
             )}
             <span className="hidden lg:inline text-foreground" id="utc-clock">--:--:-- IST</span>
+            <nav className="flex items-center gap-1">
+              <Link
+                to="/"
+                activeOptions={{ exact: true }}
+                className="inline-flex items-center gap-1.5 rounded border border-border px-2 py-1 font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground"
+                activeProps={{ className: "border-primary/50 bg-primary/10 text-primary" }}
+              >
+                <LayoutDashboard className="h-3 w-3" /> <span className="hidden sm:inline">Live Ops</span>
+              </Link>
+              <Link
+                to="/audit"
+                className="inline-flex items-center gap-1.5 rounded border border-border px-2 py-1 font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground"
+                activeProps={{ className: "border-primary/50 bg-primary/10 text-primary" }}
+              >
+                <ScrollText className="h-3 w-3" /> <span className="hidden sm:inline">Audit Logs</span>
+              </Link>
+            </nav>
             <a
               href={TELEGRAM_DISPATCH_URL}
               target="_blank"
