@@ -11,7 +11,7 @@ export type IndustrialMask = {
   ready: boolean;
   ok: boolean;
   loading: boolean;
-  /** Exact OSM industrial / brick-kiln / commercial / residential polygons. */
+  /** Exact OSM industrial / brick-kiln polygons. */
   geojson: FeatureCollection<Polygon, { name: string; landuse: MaskKind }> | null;
   /** Fires inside one of those polygons — suppressed. */
   suppressedIds: Set<string>;
@@ -23,7 +23,7 @@ export function useIndustrialMask(fires: LiveFire[]): IndustrialMask {
   const fetchAreas = useServerFn(getIndustrialAreas);
 
   const query = useQuery({
-    queryKey: ["overpass-landuse-v4", OSM_MASK_BBOX],
+    queryKey: ["overpass-landuse-v5", OSM_MASK_BBOX],
     staleTime: 6 * 60 * 60_000,
     retry: 1,
     queryFn: () => fetchAreas({ data: { ...OSM_MASK_BBOX } }),

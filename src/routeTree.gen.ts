@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as ApiPublicCronDispatchRouteImport } from './routes/api/public/cron-dispatch'
 import { Route as ApiPublicGeeDebugRouteImport } from './routes/api/public/gee-debug'
@@ -28,6 +29,11 @@ const AuthRoute = AuthRouteImport.update({
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedAuditRoute = AuthenticatedAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
@@ -49,12 +55,14 @@ const ApiPublicGeeDebugRoute = ApiPublicGeeDebugRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/auth': typeof AuthRoute
+  '/audit': typeof AuthenticatedAuditRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/api/public/cron-dispatch': typeof ApiPublicCronDispatchRoute
   '/api/public/gee-debug': typeof ApiPublicGeeDebugRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
+  '/audit': typeof AuthenticatedAuditRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/': typeof AuthenticatedIndexRoute
   '/api/public/cron-dispatch': typeof ApiPublicCronDispatchRoute
@@ -64,6 +72,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/_authenticated/audit': typeof AuthenticatedAuditRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/api/public/cron-dispatch': typeof ApiPublicCronDispatchRoute
@@ -74,12 +83,14 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/audit'
     | '/onboarding'
     | '/api/public/cron-dispatch'
     | '/api/public/gee-debug'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/auth'
+    | '/audit'
     | '/onboarding'
     | '/'
     | '/api/public/cron-dispatch'
@@ -88,6 +99,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_authenticated'
     | '/auth'
+    | '/_authenticated/audit'
     | '/_authenticated/onboarding'
     | '/_authenticated/'
     | '/api/public/cron-dispatch'
@@ -124,6 +136,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/audit': {
+      id: '/_authenticated/audit'
+      path: '/audit'
+      fullPath: '/audit'
+      preLoaderRoute: typeof AuthenticatedAuditRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/onboarding': {
       id: '/_authenticated/onboarding'
       path: '/onboarding'
@@ -149,11 +168,13 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAuditRoute: typeof AuthenticatedAuditRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAuditRoute: AuthenticatedAuditRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
 }

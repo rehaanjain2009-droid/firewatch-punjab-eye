@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { fetchActiveFires } from "@/lib/gee.server";
-import { isDispatched, markDispatched, pruneDedup, sendTelegram } from "@/lib/telegram.server";
+import { dispatchIncident, loadOfficerDirectory, recordActiveIncidents } from "@/lib/incidents.server";
 import { fetchIndustrialAreas } from "@/lib/overpass.server";
 import { loadWardCollection, computeWardMask } from "@/lib/wardMask";
 import {
@@ -36,14 +36,13 @@ async function handle(request: Request) {
     });
   }
 
-  pruneDedup();
   const data = await fetchActiveFires(1);
   if (!data) {
     return Response.json({ ok: false, error: "FIRMS_MAP_KEY not configured" }, { status: 500 });
   }
 
   // Step 2 — Suppress ONLY fires inside the MC Ludhiana ward core or an exact
-  // OSM industrial / brick-kiln / commercial / residential polygon.
+  // OSM industrial / brick-kiln polygon. Farmland and villages stay active.
   const [wards, osm] = await Promise.all([
     loadWardCollection(),
     fetchIndustrialAreas(OSM_MASK_BBOX.south, OSM_MASK_BBOX.west, OSM_MASK_BBOX.north, OSM_MASK_BBOX.east),
@@ -61,25 +60,22 @@ async function handle(request: Request) {
     agricultural.push(f);
   }
 
-  const candidates = agricultural
-    .filter((f) => shouldAutoDispatch(f.confidence) && !isDispatched(f))
+  // Step 3 — Permanently log every active fire, then dispatch >= 70% ones.
+  // Dedup lives in the audit log (atomic claim), so restarts never re-send.
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const directory = await loadOfficerDirectory(supabaseAdmin);
+  const withBlock = agricultural.map((f) => ({ ...f, block: nearestBlock(f.lat, f.lng) }));
+  await recordActiveIncidents(supabaseAdmin, withBlock, directory);
+
+  const candidates = withBlock
+    .filter((f) => shouldAutoDispatch(f.confidence))
     .sort((a, b) => b.confidence - a.confidence)
     .slice(0, MAX_PER_RUN);
 
-  const results: { lat: number; lng: number; confidence: number; ok: boolean; status: number }[] = [];
+  const results: { lat: number; lng: number; confidence: number; ok: boolean; status: number; skipped?: boolean }[] = [];
   for (const f of candidates) {
-    const r = await sendTelegram({
-      block: nearestBlock(f.lat, f.lng),
-      lat: f.lat,
-      lng: f.lng,
-      confidence: f.confidence,
-      frp: f.frp,
-      acqDate: f.acqDate,
-      acqTime: f.acqTime,
-      satellite: f.satellite,
-    });
-    if (r.ok) markDispatched(f);
-    results.push({ lat: f.lat, lng: f.lng, confidence: f.confidence, ok: r.ok, status: r.status });
+    const r = await dispatchIncident(supabaseAdmin, f, "auto_cron", false, directory);
+    results.push({ lat: f.lat, lng: f.lng, confidence: f.confidence, ok: r.ok, status: r.status, skipped: r.skipped });
   }
 
   return Response.json({
@@ -90,9 +86,11 @@ async function handle(request: Request) {
     osmPolygons: osm.features.length,
     osmMaskOk: osm.ok,
     agricultural: agricultural.length,
+    officersLocated: directory.length,
     source: data.source,
     threshold: `>= ${DISPATCH_MIN_CONFIDENCE}%`,
-    dispatched: results.filter((r) => r.ok).length,
+    dispatched: results.filter((r) => r.ok && !r.skipped).length,
+    alreadyDispatched: results.filter((r) => r.skipped).length,
     results,
   });
 }

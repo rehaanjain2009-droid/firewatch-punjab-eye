@@ -8,6 +8,9 @@ import { HourlyChart } from "@/components/dashboard/HourlyChart";
 import { OfficerOnboardingModal } from "@/components/dashboard/OfficerOnboardingModal";
 import { getActiveFires, getGeeStatus, getTileLayers, dispatchTelegram } from "@/lib/gee.functions";
 import { getMyProfile } from "@/lib/profile.functions";
+import { syncIncidents, updateIncident } from "@/lib/incidents.functions";
+import { incidentKey } from "@/lib/officerMatch";
+import { useOfficerAssignments } from "@/hooks/useOfficerDirectory";
 import { useCroplandMask } from "@/hooks/useCroplandMask";
 import { useIndustrialMask } from "@/hooks/useIndustrialMask";
 import { useWardMask } from "@/hooks/useWardMask";
@@ -28,6 +31,10 @@ export const Route = createFileRoute("/_authenticated/")({
     meta: [
       { title: "PPF Command & Control · Ludhiana Stubble Fire Intelligence" },
       { name: "description", content: "Punjab Pollution Control tactical dashboard for real-time NASA FIRMS detections, Sentinel-2 burn-scar overlays, and field dispatch across the Ludhiana sector." },
+      { property: "og:title", content: "PPF Command & Control · Ludhiana Stubble Fire Intelligence" },
+      { property: "og:description", content: "Live stubble fire detections, officer assignment and Telegram dispatch for the Ludhiana sector." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
 });
@@ -74,7 +81,6 @@ function ClientMapView(props: React.ComponentProps<typeof MapView>) {
 function Dashboard() {
   const { profile } = Route.useLoaderData();
   const [liveFires, setLiveFires] = useState<LiveFire[]>([]);
-  const [dispatchCount, setDispatchCount] = useState(0);
   const [firesLive, setFiresLive] = useState(false);
   const [firesSource, setFiresSource] = useState<string>("");
   const [maskEnabled, setMaskEnabled] = useState(true);
@@ -110,8 +116,8 @@ function Dashboard() {
   const ward = useWardMask(fires);
 
   // A fire is suppressed ONLY when it lies inside an exact OSM industrial /
-  // brick-kiln / commercial / residential polygon, or inside the MC Ludhiana
-  // ward core. Farmland, forest and all other land stay active. The map's
+  // brick-kiln polygon, or inside the MC Ludhiana ward core. Village
+  // residential tags never mask. Farmland, forest and all other land stay active. The map's
   // mask toggle only hides the overlay — suppression always applies, matching
   // the hourly cron route.
   const suppressedIds = useMemo(() => {
@@ -155,55 +161,81 @@ function Dashboard() {
   const suppressedCount = suppressedIds.size;
   const nbrTile = useMemo(() => tiles.find((t) => t.id === "nbr")?.tileUrl, [tiles]);
 
+  const officers = useOfficerAssignments(activeFires);
+  const syncFn = useServerFn(syncIncidents);
+  const updateFn = useServerFn(updateIncident);
+
   // ------------------------------------------------------------------
-  // Autonomous dispatch pipeline: any fire that is ACTIVE (outside every
-  // ward / OSM built-up mask) AND has confidence >= 70% (VIIRS "n" → 70,
-  // "h" → 90, MODIS numeric) is pushed to Telegram automatically.
-  // Waits for the OSM lookup to finish so masked fires are never sent.
+  // Audit + autonomous dispatch pipeline. Once both masks have resolved,
+  // every ACTIVE fire is written to the permanent incident log, then any
+  // fire with confidence >= 70% that has never been dispatched is pushed to
+  // Telegram. The database claim prevents double-sends with the hourly job.
   // ------------------------------------------------------------------
-  const autoSentRef = useRef<Set<string>>(new Set());
-  const [autoDispatched, setAutoDispatched] = useState<Set<string>>(new Set());
+  const syncedRef = useRef<Set<string>>(new Set());
+  const [dispatchedIds, setDispatchedIds] = useState<Set<string>>(new Set());
   useEffect(() => {
     if (!firesLive || !ward.ready || !industrial.ready) return;
-    const targets = activeFires.filter(
-      (f) => shouldAutoDispatch(f.confidence) && !autoSentRef.current.has(f.id),
-    );
-    if (targets.length === 0) return;
-    for (const f of targets) autoSentRef.current.add(f.id);
-    setAutoDispatched(new Set(autoSentRef.current));
+    const fresh = activeFires.filter((f) => !syncedRef.current.has(f.id));
+    if (fresh.length === 0) return;
+    for (const f of fresh) syncedRef.current.add(f.id);
     let cancelled = false;
     (async () => {
+      const toInput = (f: LiveFire) => ({
+        lat: f.lat, lng: f.lng, frp: f.frp, confidence: f.confidence,
+        acqDate: f.acqDate, acqTime: f.acqTime, satellite: f.satellite,
+        daynight: f.daynight, block: f.block,
+      });
+      let rows: { fire_key: string; status: string; dispatched_at: string | null }[] = [];
+      try {
+        rows = (await syncFn({ data: { fires: fresh.map(toInput) } })).incidents;
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn("[audit] sync failed", (err as Error).message);
+      }
+      if (cancelled) return;
+      const byKey = new Map(rows.map((r) => [r.fire_key, r]));
+      const already = new Set<string>();
+      const restored: Record<string, FireStatus> = {};
+      for (const f of fresh) {
+        const r = byKey.get(incidentKey(f));
+        if (!r) continue;
+        if (r.dispatched_at) already.add(f.id);
+        if (r.status === "resolved") restored[f.id] = "verified";
+        else if (r.status === "false_alarm") restored[f.id] = "false_alarm";
+      }
+      if (already.size) setDispatchedIds((s) => new Set([...s, ...already]));
+      if (Object.keys(restored).length) setStatuses((s) => ({ ...restored, ...s }));
+
+      const targets = fresh.filter((f) => shouldAutoDispatch(f.confidence) && !already.has(f.id));
       for (const f of targets) {
         try {
-          const r = await sendDispatch({
-            data: {
-              block: f.block,
-              lat: f.lat,
-              lng: f.lng,
-              confidence: f.confidence,
-              frp: f.frp,
-              acqDate: f.acqDate,
-              acqTime: f.acqTime,
-              satellite: f.satellite,
-            },
-          });
+          const r = await sendDispatch({ data: { ...toInput(f), channel: "auto_dashboard" } });
           if (cancelled) return;
-          if (r.ok) {
-            setDispatchCount((c) => c + 1);
-          } else {
-            // eslint-disable-next-line no-console
-            console.warn("[auto-dispatch] telegram rejected", f.id, r.status, r.body);
-          }
+          if (r.ok) setDispatchedIds((s) => new Set(s).add(f.id));
+          else console.warn("[auto-dispatch] telegram rejected", f.id, r.status, r.body);
         } catch (err) {
-          if (!cancelled) {
-            // eslint-disable-next-line no-console
-            console.warn("[auto-dispatch] failed", f.id, (err as Error).message);
-          }
+          if (!cancelled) console.warn("[auto-dispatch] failed", f.id, (err as Error).message);
         }
       }
     })();
     return () => { cancelled = true; };
-  }, [activeFires, firesLive, ward.ready, industrial.ready, sendDispatch]);
+  }, [activeFires, firesLive, ward.ready, industrial.ready, sendDispatch, syncFn]);
+
+  const dispatchCount = useMemo(
+    () => activeFires.filter((f) => dispatchedIds.has(f.id)).length,
+    [activeFires, dispatchedIds],
+  );
+
+  const handleStatusChange = (id: string, status: FireStatus) => {
+    setStatuses((s) => ({ ...s, [id]: status }));
+    const f = activeFires.find((x) => x.id === id);
+    if (!f) return;
+    const dbStatus =
+      status === "verified" ? "resolved" : status === "false_alarm" ? "false_alarm" : dispatchedIds.has(id) ? "dispatched" : "active";
+    updateFn({ data: { fireKey: incidentKey(f), status: dbStatus } }).catch((err) =>
+      console.warn("[audit] status update failed", (err as Error).message),
+    );
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -241,9 +273,10 @@ function Dashboard() {
               live={firesLive}
               places={mask.places}
               statuses={statuses}
-              autoDispatched={autoDispatched}
-              onStatusChange={(id, status) => setStatuses((s) => ({ ...s, [id]: status }))}
-              onDispatched={() => setDispatchCount((c) => c + 1)}
+              autoDispatched={dispatchedIds}
+              assignments={officers.byId}
+              onStatusChange={handleStatusChange}
+              onDispatched={(id) => setDispatchedIds((s) => new Set(s).add(id))}
               tileUrl={nbrTile}
             />
           </div>

@@ -1,4 +1,4 @@
-import type { FirePoint } from "./gee.server";
+import type { OfficerAssignment } from "./officerMatch";
 
 export type DispatchInput = {
   block: string;
@@ -9,6 +9,7 @@ export type DispatchInput = {
   acqDate: string;
   acqTime: string;
   satellite: string;
+  assignment?: OfficerAssignment | null;
 };
 
 function fmtTime(d: string, t: string) {
@@ -19,6 +20,20 @@ function fmtTime(d: string, t: string) {
 
 function escapeHtml(s: string) {
   return s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]!));
+}
+
+function officerLines(a?: OfficerAssignment | null): string[] {
+  if (!a) return [``, `👮 <b>Assigned officers:</b> no village match in directory`];
+  const where = `${escapeHtml(a.village)} (${escapeHtml(a.block)} block${a.thana ? `, PS ${escapeHtml(a.thana)}` : ""})`;
+  const lines = [
+    ``,
+    `🏘 <b>Village:</b> ${where}${a.approximate ? ` · nearest listed, ${a.distanceKm} km` : ""}`,
+    `👮 <b>Assigned officers:</b>`,
+  ];
+  for (const o of a.officers) {
+    lines.push(`• ${o.role}: ${escapeHtml(o.name)}${o.contact ? ` · ☎ ${escapeHtml(o.contact)}` : ""}`);
+  }
+  return lines;
 }
 
 export function buildMessage(f: DispatchInput): string {
@@ -33,6 +48,7 @@ export function buildMessage(f: DispatchInput): string {
     `🎯 <b>AI Confidence:</b> ${f.confidence}%`,
     `🔥 <b>Fire Radiative Power:</b> ${f.frp.toFixed(1)} MW`,
     `🧭 <b>Coordinates:</b> ${f.lat.toFixed(4)}, ${f.lng.toFixed(4)}`,
+    ...officerLines(f.assignment),
     ``,
     `🗺 <a href="${mapsUrl}">Open in Google Maps</a>`,
   ].join("\n");
@@ -58,33 +74,4 @@ export async function sendTelegram(
   });
   const body = (await res.text()).slice(0, 500);
   return { ok: res.ok, status: res.status, body };
-}
-
-// Module-level dedup cache for the cron job (per-worker instance).
-const dispatchedIds = new Set<string>();
-const DEDUP_TTL_MS = 24 * 60 * 60 * 1000;
-const dispatchedTs = new Map<string, number>();
-
-function fireKey(f: FirePoint): string {
-  return `${f.lat.toFixed(4)}_${f.lng.toFixed(4)}_${f.acqDate}_${f.acqTime}`;
-}
-
-export function pruneDedup() {
-  const cutoff = Date.now() - DEDUP_TTL_MS;
-  for (const [k, ts] of dispatchedTs) {
-    if (ts < cutoff) {
-      dispatchedTs.delete(k);
-      dispatchedIds.delete(k);
-    }
-  }
-}
-
-export function isDispatched(f: FirePoint): boolean {
-  return dispatchedIds.has(fireKey(f));
-}
-
-export function markDispatched(f: FirePoint) {
-  const k = fireKey(f);
-  dispatchedIds.add(k);
-  dispatchedTs.set(k, Date.now());
 }

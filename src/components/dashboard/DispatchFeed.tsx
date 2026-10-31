@@ -1,10 +1,11 @@
 import { useState, useMemo } from "react";
-import { Copy, Send, Clock, AlertTriangle, Radio, Check, Loader2, Satellite, MapPin } from "lucide-react";
+import { Copy, Send, Clock, AlertTriangle, Radio, Check, Loader2, Satellite, MapPin, Phone, Users } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { dispatchTelegram } from "@/lib/gee.functions";
 import type { LiveFire } from "./MapView";
 import { BurnScarModal } from "./BurnScarModal";
 import type { PlaceInfo } from "@/hooks/useCroplandMask";
+import type { OfficerAssignment } from "@/lib/officerMatch";
 
 
 function confTone(c: number) {
@@ -27,13 +28,15 @@ export type FireStatus = "pending" | "verified" | "false_alarm";
 type Props = {
   fires: LiveFire[];
   live: boolean;
-  onDispatched?: () => void;
+  onDispatched?: (id: string) => void;
   places?: Map<string, PlaceInfo>;
   statuses?: Record<string, FireStatus>;
   onStatusChange?: (id: string, status: FireStatus) => void;
   tileUrl?: string;
   /** Fires already pushed automatically by the >=70% confidence trigger. */
   autoDispatched?: Set<string>;
+  /** Nearest-village officers (Patwari, SHO, Nodal) per fire id. */
+  assignments?: Map<string, OfficerAssignment>;
 };
 
 const STATUS_OPTIONS: { key: FireStatus; label: string; cls: string }[] = [
@@ -42,7 +45,7 @@ const STATUS_OPTIONS: { key: FireStatus; label: string; cls: string }[] = [
   { key: "false_alarm", label: "False Alarm", cls: "bg-[oklch(0.82_0.17_80/0.18)] text-[oklch(0.88_0.17_80)] border-[oklch(0.82_0.17_80/0.5)]" },
 ];
 
-export function DispatchFeed({ fires, live, onDispatched, places, statuses, onStatusChange, tileUrl, autoDispatched }: Props) {
+export function DispatchFeed({ fires, live, onDispatched, places, statuses, onStatusChange, tileUrl, autoDispatched, assignments }: Props) {
 
   const [copied, setCopied] = useState<string | null>(null);
   const [dispatched, setDispatched] = useState<Set<string>>(new Set());
@@ -83,15 +86,14 @@ export function DispatchFeed({ fires, live, onDispatched, places, statuses, onSt
           acqDate: f.acqDate,
           acqTime: f.acqTime,
           satellite: f.satellite,
+          daynight: f.daynight,
+          channel: "manual",
+          force: true,
         },
       });
       if (r.ok) {
-        setDispatched((s) => {
-          if (s.has(f.id)) return s;
-          const n = new Set(s).add(f.id);
-          onDispatched?.();
-          return n;
-        });
+        setDispatched((s) => new Set(s).add(f.id));
+        onDispatched?.(f.id);
       } else {
         setErrors((e) => ({ ...e, [f.id]: `HTTP ${r.status}: ${r.body.slice(0, 80)}` }));
       }
@@ -163,6 +165,7 @@ export function DispatchFeed({ fires, live, onDispatched, places, statuses, onSt
                       Location: {places?.get(f.id)?.ok ? places.get(f.id)!.label : "resolving land use…"}
                     </span>
                   </div>
+                  <OfficerBlock a={assignments?.get(f.id)} />
 
                 </div>
               </div>
@@ -229,3 +232,42 @@ export function DispatchFeed({ fires, live, onDispatched, places, statuses, onSt
   );
 }
 
+
+function OfficerBlock({ a }: { a?: OfficerAssignment }) {
+  if (!a) {
+    return (
+      <div className="mt-1.5 text-mono text-[10px] text-muted-foreground">
+        <Users className="mr-1 inline h-3 w-3" /> Matching responsible officers…
+      </div>
+    );
+  }
+  return (
+    <div className="mt-2 rounded border border-border bg-background/40 px-2 py-1.5">
+      <div className="flex items-center gap-1.5 text-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+        <Users className="h-3 w-3" />
+        <span className="truncate text-foreground">
+          {a.village} · {a.block} block{a.thana ? ` · PS ${a.thana}` : ""}
+        </span>
+        <span className={`ml-auto shrink-0 ${a.approximate ? "text-[oklch(0.88_0.17_80)]" : ""}`}>
+          {a.approximate ? `nearest · ${a.distanceKm} km` : `${a.distanceKm} km`}
+        </span>
+      </div>
+      <ul className="mt-1 space-y-0.5">
+        {a.officers.map((o) => (
+          <li key={o.role} className="flex items-center gap-2 text-[11px]">
+            <span className="w-[84px] shrink-0 text-mono text-[9px] font-bold uppercase tracking-wider text-muted-foreground">{o.role}</span>
+            <span className="min-w-0 flex-1 truncate text-foreground">{o.name}</span>
+            {o.contact && (
+              <a
+                href={`tel:${o.contact.split(/[&,/]/)[0].replace(/[^0-9+]/g, "")}`}
+                className="inline-flex shrink-0 items-center gap-1 text-mono text-[10px] text-primary hover:underline"
+              >
+                <Phone className="h-2.5 w-2.5" /> {o.contact}
+              </a>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}

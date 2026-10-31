@@ -1,8 +1,8 @@
 /**
  * OpenStreetMap Overpass API — exact built-up / industrial polygons.
- * Fetches ONLY: landuse=industrial, landuse=commercial, landuse=residential,
- * man_made=kiln and industrial=brick_kiln. Farmland/forest are never fetched,
- * so agricultural land is never masked.
+ * Fetches ONLY: landuse=industrial, man_made=kiln and industrial=brick_kiln.
+ * Residential/commercial (which also covers rural villages), farmland and
+ * forest are never fetched, so farm fires are never masked.
  */
 import { classifyOsmTags, type IndustrialFeature, type Ring } from "./landuseMask";
 
@@ -18,7 +18,7 @@ const ENDPOINTS = [
   "https://overpass.kumi.systems/api/interpreter",
 ];
 
-const QUERY_VERSION = "4"; // bump when the Overpass query changes to invalidate cached masks
+const QUERY_VERSION = "5"; // bump when the Overpass query changes to invalidate cached masks
 // Kilns mapped as a single point get a small square footprint (~120 m half-width).
 const KILN_NODE_HALF_DEG = 0.0011;
 
@@ -26,8 +26,8 @@ function buildQuery(south: number, west: number, north: number, east: number) {
   const bbox = `${south},${west},${north},${east}`;
   return `[out:json][timeout:120];
 (
-  way["landuse"~"^(industrial|commercial|residential)$"](${bbox});
-  relation["landuse"~"^(industrial|commercial|residential)$"](${bbox});
+  way["landuse"="industrial"](${bbox});
+  relation["landuse"="industrial"](${bbox});
   nwr["man_made"="kiln"](${bbox});
   nwr["industrial"="brick_kiln"](${bbox});
 );

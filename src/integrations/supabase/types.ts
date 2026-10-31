@@ -14,6 +14,171 @@ export type Database = {
   }
   public: {
     Tables: {
+      incidents_audit_log: {
+        Row: {
+          assigned_officers: Json
+          block: string | null
+          confidence: number
+          created_at: string
+          daynight: string | null
+          detected_at: string
+          dispatch_channel: string | null
+          dispatch_count: number
+          dispatched_at: string | null
+          field_notes: string | null
+          fire_key: string
+          frp: number
+          id: string
+          lat: number
+          lng: number
+          proof_image_urls: string[]
+          resolved_at: string | null
+          resolved_by: string | null
+          satellite: string | null
+          status: string
+          status_history: Json
+          updated_at: string
+          village: string | null
+          village_distance_km: number | null
+        }
+        Insert: {
+          assigned_officers?: Json
+          block?: string | null
+          confidence?: number
+          created_at?: string
+          daynight?: string | null
+          detected_at: string
+          dispatch_channel?: string | null
+          dispatch_count?: number
+          dispatched_at?: string | null
+          field_notes?: string | null
+          fire_key: string
+          frp?: number
+          id?: string
+          lat: number
+          lng: number
+          proof_image_urls?: string[]
+          resolved_at?: string | null
+          resolved_by?: string | null
+          satellite?: string | null
+          status?: string
+          status_history?: Json
+          updated_at?: string
+          village?: string | null
+          village_distance_km?: number | null
+        }
+        Update: {
+          assigned_officers?: Json
+          block?: string | null
+          confidence?: number
+          created_at?: string
+          daynight?: string | null
+          detected_at?: string
+          dispatch_channel?: string | null
+          dispatch_count?: number
+          dispatched_at?: string | null
+          field_notes?: string | null
+          fire_key?: string
+          frp?: number
+          id?: string
+          lat?: number
+          lng?: number
+          proof_image_urls?: string[]
+          resolved_at?: string | null
+          resolved_by?: string | null
+          satellite?: string | null
+          status?: string
+          status_history?: Json
+          updated_at?: string
+          village?: string | null
+          village_distance_km?: number | null
+        }
+        Relationships: []
+      }
+      officer_directory: {
+        Row: {
+          block: string
+          cluster_officer_contact: string | null
+          cluster_officer_name: string | null
+          created_at: string
+          district: string
+          dsp_contact: string | null
+          dsp_name: string | null
+          hb_no: string | null
+          id: string
+          lat: number | null
+          lng: number | null
+          location_source: string | null
+          nodal_officer_contact: string | null
+          nodal_officer_designation: string | null
+          nodal_officer_name: string | null
+          patwari_contact: string | null
+          patwari_name: string | null
+          s_no: number | null
+          sdm_contact: string | null
+          sdm_name: string | null
+          sho_contact: string | null
+          sho_name: string | null
+          tehsil: string | null
+          thana: string | null
+          village: string
+        }
+        Insert: {
+          block: string
+          cluster_officer_contact?: string | null
+          cluster_officer_name?: string | null
+          created_at?: string
+          district?: string
+          dsp_contact?: string | null
+          dsp_name?: string | null
+          hb_no?: string | null
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          location_source?: string | null
+          nodal_officer_contact?: string | null
+          nodal_officer_designation?: string | null
+          nodal_officer_name?: string | null
+          patwari_contact?: string | null
+          patwari_name?: string | null
+          s_no?: number | null
+          sdm_contact?: string | null
+          sdm_name?: string | null
+          sho_contact?: string | null
+          sho_name?: string | null
+          tehsil?: string | null
+          thana?: string | null
+          village: string
+        }
+        Update: {
+          block?: string
+          cluster_officer_contact?: string | null
+          cluster_officer_name?: string | null
+          created_at?: string
+          district?: string
+          dsp_contact?: string | null
+          dsp_name?: string | null
+          hb_no?: string | null
+          id?: string
+          lat?: number | null
+          lng?: number | null
+          location_source?: string | null
+          nodal_officer_contact?: string | null
+          nodal_officer_designation?: string | null
+          nodal_officer_name?: string | null
+          patwari_contact?: string | null
+          patwari_name?: string | null
+          s_no?: number | null
+          sdm_contact?: string | null
+          sdm_name?: string | null
+          sho_contact?: string | null
+          sho_name?: string | null
+          tehsil?: string | null
+          thana?: string | null
+          village?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -46,7 +211,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      claim_incident_dispatch: {
+        Args: { _channel: string; _fire_key: string; _force?: boolean }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

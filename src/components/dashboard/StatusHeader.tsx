@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { Activity, Flame, Zap, ShieldCheck, Truck, ShieldAlert, Radio, LogOut, User, Send } from "lucide-react";
+import { Activity, Flame, Zap, ShieldCheck, Truck, ShieldAlert, Radio, LogOut, User, Send, ScrollText, LayoutDashboard } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { TELEGRAM_DISPATCH_URL } from "@/components/dashboard/OfficerOnboardingModal";
 import type { LiveFire } from "@/components/dashboard/MapView";
@@ -41,9 +41,9 @@ function Counter({ icon: Icon, label, value, tone, sub }: { icon: React.Componen
   );
 }
 
-type Props = { outcome?: { verified: number; falseAlarms: number; pending: number }; email?: string | null; telegramHandle?: string | null; dispatchCount?: number; fires?: LiveFire[]; firmsLive?: boolean; suppressedCount?: number; maskReady?: boolean };
+type Props = { outcome?: { verified: number; falseAlarms: number; pending: number }; email?: string | null; telegramHandle?: string | null; dispatchCount?: number; fires?: LiveFire[]; firmsLive?: boolean; suppressedCount?: number; maskReady?: boolean; /** "nav" hides the live metrics (used on non-dashboard pages). */ variant?: "full" | "nav" };
 
-export function StatusHeader({ outcome, email, telegramHandle, dispatchCount = 0, fires = [], firmsLive = false, suppressedCount = 0, maskReady = false }: Props = {}) {
+export function StatusHeader({ outcome, email, telegramHandle, dispatchCount = 0, fires = [], firmsLive = false, suppressedCount = 0, maskReady = false, variant = "full" }: Props = {}) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
@@ -108,6 +108,23 @@ export function StatusHeader({ outcome, email, telegramHandle, dispatchCount = 0
               </span>
             )}
             <span className="hidden lg:inline text-foreground" id="utc-clock">--:--:-- IST</span>
+            <nav className="flex items-center gap-1">
+              <Link
+                to="/"
+                activeOptions={{ exact: true }}
+                className="inline-flex items-center gap-1.5 rounded border border-border px-2 py-1 font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground"
+                activeProps={{ className: "border-primary/50 bg-primary/10 text-primary" }}
+              >
+                <LayoutDashboard className="h-3 w-3" /> <span className="hidden sm:inline">Live Ops</span>
+              </Link>
+              <Link
+                to="/audit"
+                className="inline-flex items-center gap-1.5 rounded border border-border px-2 py-1 font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground"
+                activeProps={{ className: "border-primary/50 bg-primary/10 text-primary" }}
+              >
+                <ScrollText className="h-3 w-3" /> <span className="hidden sm:inline">Audit Logs</span>
+              </Link>
+            </nav>
             <a
               href={TELEGRAM_DISPATCH_URL}
               target="_blank"
@@ -126,6 +143,7 @@ export function StatusHeader({ outcome, email, telegramHandle, dispatchCount = 0
           </div>
         </div>
 
+        {variant === "full" && (<>
         <div className="text-mono mt-3 flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-wider">
           <span className="text-muted-foreground">Field outcomes</span>
           <Pill tone="emerald"><ShieldCheck className="h-3 w-3" />Verified {outcome?.verified ?? 0}</Pill>
@@ -138,10 +156,10 @@ export function StatusHeader({ outcome, email, telegramHandle, dispatchCount = 0
           <Counter icon={Flame} label="Total Thermal Anomalies" value={String(total)} tone="crimson" sub="Active FIRMS detections" />
           <Counter icon={Zap} label="Peak Intensity · Max FRP" value={peakValue} tone="amber" sub="Fire Radiative Power" />
           <Counter icon={ShieldCheck} label="High Confidence Detections" value={String(highConfidence)} tone="crimson" sub="Confidence ≥ 80%" />
-          <Counter icon={ShieldAlert} label="Urban Fires Suppressed" value={maskReady ? String(suppressedCount) : "—"} tone="amber" sub="MC wards + OSM built-up/kilns" />
+          <Counter icon={ShieldAlert} label="Urban Fires Suppressed" value={maskReady ? String(suppressedCount) : "—"} tone="amber" sub="MC wards + industrial / kilns" />
           <Counter icon={Truck} label="Alerts Dispatched" value={String(dispatchCount)} tone="emerald" sub="Auto + manual dispatches" />
-
         </div>
+        </>)}
       </div>
     </header>
   );

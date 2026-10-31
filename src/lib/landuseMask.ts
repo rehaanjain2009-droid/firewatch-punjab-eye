@@ -4,7 +4,9 @@ import type { Feature, Polygon } from "geojson";
 
 /**
  * Shared (browser + server) land-use masking rules.
- * Only exact OSM polygons tagged as built-up or industrial suppress a fire.
+ * Only exact OSM polygons tagged industrial or brick kiln suppress a fire.
+ * Residential / commercial tags are NOT masks: rural villages carry
+ * landuse=residential, so masking them would hide genuine farm fires.
  * Farmland, forest and any untagged land never suppress.
  */
 
@@ -12,8 +14,8 @@ import type { Feature, Polygon } from "geojson";
 export const OSM_MASK_BBOX = { south: 30.5, west: 75.3, north: 31.15, east: 76.3 } as const;
 
 /** The only OSM classes that suppress a fire. */
-export type MaskKind = "industrial" | "brick_kiln" | "commercial" | "residential";
-export const SUPPRESSING_KINDS: readonly MaskKind[] = ["industrial", "brick_kiln", "commercial", "residential"];
+export type MaskKind = "industrial" | "brick_kiln";
+export const SUPPRESSING_KINDS: readonly MaskKind[] = ["industrial", "brick_kiln"];
 
 export type Ring = [number, number][]; // [lng, lat]
 export type IndustrialFeature = {
@@ -34,8 +36,7 @@ export function shouldAutoDispatch(confidence: number): boolean {
 /** Map raw OSM tags to a suppressing class, or null when the area must stay unmasked. */
 export function classifyOsmTags(tags: Record<string, string>): MaskKind | null {
   if (tags["man_made"] === "kiln" || tags["industrial"] === "brick_kiln") return "brick_kiln";
-  const lu = tags["landuse"];
-  if (lu === "industrial" || lu === "commercial" || lu === "residential") return lu;
+  if (tags["landuse"] === "industrial") return "industrial";
   return null;
 }
 
@@ -72,8 +73,8 @@ function prepare(features: IndustrialFeature[]): Prepared[] {
 }
 
 /**
- * A fire is suppressed only when it lies inside an OSM industrial, brick-kiln,
- * commercial or residential polygon. Everything else stays active.
+ * A fire is suppressed only when it lies inside an OSM industrial or
+ * brick-kiln polygon. Everything else stays active.
  */
 export function computeLanduseMask(
   fires: { id: string; lat: number; lng: number }[],
