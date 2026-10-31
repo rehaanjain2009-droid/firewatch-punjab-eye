@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense, useMemo } from "react";
+import { useEffect, useState, lazy, Suspense, useMemo, useRef } from "react";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { StatusHeader } from "@/components/dashboard/StatusHeader";
@@ -6,10 +6,11 @@ import type { LiveFire } from "@/components/dashboard/MapView";
 import { DispatchFeed, type FireStatus } from "@/components/dashboard/DispatchFeed";
 import { HourlyChart } from "@/components/dashboard/HourlyChart";
 import { OfficerOnboardingModal } from "@/components/dashboard/OfficerOnboardingModal";
-import { getActiveFires, getGeeStatus, getTileLayers } from "@/lib/gee.functions";
+import { getActiveFires, getGeeStatus, getTileLayers, dispatchTelegram } from "@/lib/gee.functions";
 import { getMyProfile } from "@/lib/profile.functions";
 import { useCroplandMask } from "@/hooks/useCroplandMask";
 import { useIndustrialMask } from "@/hooks/useIndustrialMask";
+import { useWardMask } from "@/hooks/useWardMask";
 
 const MapView = lazy(() => import("@/components/dashboard/MapView").then((m) => ({ default: m.MapView })));
 
@@ -80,6 +81,7 @@ function Dashboard() {
   const fetchFires = useServerFn(getActiveFires);
   const fetchStatus = useServerFn(getGeeStatus);
   const fetchTiles = useServerFn(getTileLayers);
+  const sendDispatch = useServerFn(dispatchTelegram);
   const [diag, setDiag] = useState<any>(null);
   const [tiles, setTiles] = useState<{ id: "nbr" | "cropland"; label: string; tileUrl: string }[]>([]);
 
@@ -103,36 +105,96 @@ function Dashboard() {
 
   const mask = useCroplandMask(fires);
   const industrial = useIndustrialMask(fires);
+  const ward = useWardMask(fires);
+
+  // Strict spatial masking: MC ward boundaries ALWAYS suppress (urban /
+  // industrial land). Cropland + Overpass industrial masks honor the map toggle.
   const suppressedIds = useMemo(() => {
     const s = new Set<string>();
-    if (mask.ready && mask.ok) for (const id of mask.suppressedIds) s.add(id);
-    for (const id of industrial.suppressedIds) s.add(id);
+    for (const id of ward.suppressedIds) s.add(id);
+    if (maskEnabled) {
+      if (mask.ready && mask.ok) for (const id of mask.suppressedIds) s.add(id);
+      for (const id of industrial.suppressedIds) s.add(id);
+    }
     return s;
-  }, [mask, industrial]);
-  const visibleFires = useMemo(
-    () => (maskEnabled ? fires.filter((f) => !suppressedIds.has(f.id)) : fires),
-    [fires, suppressedIds, maskEnabled],
+  }, [ward, mask, industrial, maskEnabled]);
+
+  // Only fires OUTSIDE all ward boundaries remain "active" dispatch candidates.
+  const activeFires = useMemo(
+    () => fires.filter((f) => !suppressedIds.has(f.id)),
+    [fires, suppressedIds],
   );
+
   const maskStatus: "live" | "loading" | "offline" = !maskEnabled
     ? "offline"
-    : mask.loading || industrial.loading
+    : ward.loading || mask.loading || industrial.loading
       ? "loading"
-      : industrial.ok || (mask.ready && mask.ok)
+      : ward.ready || industrial.ok || (mask.ready && mask.ok)
         ? "live"
         : "offline";
+
   const outcome = useMemo(() => {
     let verified = 0;
     let falseAlarms = 0;
-    for (const f of visibleFires) {
+    for (const f of activeFires) {
       const st = statuses[f.id];
       if (st === "verified") verified += 1;
       else if (st === "false_alarm") falseAlarms += 1;
     }
-    return { verified, falseAlarms, pending: visibleFires.length - verified - falseAlarms };
-  }, [visibleFires, statuses]);
+    return { verified, falseAlarms, pending: activeFires.length - verified - falseAlarms };
+  }, [activeFires, statuses]);
 
-  const suppressedCount = maskEnabled ? suppressedIds.size : 0;
+  const suppressedCount = suppressedIds.size;
   const nbrTile = useMemo(() => tiles.find((t) => t.id === "nbr")?.tileUrl, [tiles]);
+
+  // ------------------------------------------------------------------
+  // Autonomous dispatch pipeline: any fire that is ACTIVE (outside every
+  // MC ward boundary) AND has confidence strictly > 70% (VIIRS "h" → 90,
+  // MODIS numeric) is pushed to Telegram automatically — no manual click.
+  // ------------------------------------------------------------------
+  const autoSentRef = useRef<Set<string>>(new Set());
+  const [autoDispatched, setAutoDispatched] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!firesLive || !ward.ready) return;
+    const targets = activeFires.filter(
+      (f) => f.confidence > 70 && !autoSentRef.current.has(f.id),
+    );
+    if (targets.length === 0) return;
+    for (const f of targets) autoSentRef.current.add(f.id);
+    setAutoDispatched(new Set(autoSentRef.current));
+    let cancelled = false;
+    (async () => {
+      for (const f of targets) {
+        try {
+          const r = await sendDispatch({
+            data: {
+              block: f.block,
+              lat: f.lat,
+              lng: f.lng,
+              confidence: f.confidence,
+              frp: f.frp,
+              acqDate: f.acqDate,
+              acqTime: f.acqTime,
+              satellite: f.satellite,
+            },
+          });
+          if (cancelled) return;
+          if (r.ok) {
+            setDispatchCount((c) => c + 1);
+          } else {
+            // eslint-disable-next-line no-console
+            console.warn("[auto-dispatch] telegram rejected", f.id, r.status, r.body);
+          }
+        } catch (err) {
+          if (!cancelled) {
+            // eslint-disable-next-line no-console
+            console.warn("[auto-dispatch] failed", f.id, (err as Error).message);
+          }
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeFires, firesLive, ward.ready, sendDispatch]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -140,17 +202,17 @@ function Dashboard() {
         email={profile?.email ?? null}
         telegramHandle={profile?.telegram_handle ?? null}
         dispatchCount={dispatchCount}
-        fires={visibleFires}
+        fires={activeFires}
         firmsLive={firesLive}
         suppressedCount={suppressedCount}
-        maskReady={maskEnabled && (mask.ready && mask.ok || industrial.ok)}
+        maskReady={maskEnabled ? (ward.ready || industrial.ok || (mask.ready && mask.ok)) : ward.ready}
         outcome={outcome}
       />
       <main className="mx-auto max-w-[1600px] px-5 py-4 space-y-4">
         <section className="grid gap-4 lg:grid-cols-5">
           <div className="lg:col-span-3 h-[520px] lg:h-[calc(100vh-330px)] lg:min-h-[560px]">
             <ClientMapView
-              fires={visibleFires}
+              fires={fires}
               live={firesLive}
               source={firesSource}
               tiles={tiles}
@@ -158,14 +220,19 @@ function Dashboard() {
               maskStatus={maskStatus}
               onCroplandToggle={setMaskEnabled}
               industrialGeoJson={industrial.geojson}
+              wardGeoJson={ward.geojson}
+              wardCount={ward.count}
+              suppressedIds={suppressedIds}
+              wardById={ward.wardById}
             />
           </div>
           <div className="lg:col-span-2 h-[520px] lg:h-[calc(100vh-330px)] lg:min-h-[560px]">
             <DispatchFeed
-              fires={visibleFires}
-                live={firesLive}
+              fires={activeFires}
+              live={firesLive}
               places={mask.places}
               statuses={statuses}
+              autoDispatched={autoDispatched}
               onStatusChange={(id, status) => setStatuses((s) => ({ ...s, [id]: status }))}
               onDispatched={() => setDispatchCount((c) => c + 1)}
               tileUrl={nbrTile}
@@ -174,7 +241,7 @@ function Dashboard() {
         </section>
 
         <section className="h-[340px] pb-4">
-          <HourlyChart fires={visibleFires} />
+          <HourlyChart fires={activeFires} />
         </section>
       </main>
       <OfficerOnboardingModal />
