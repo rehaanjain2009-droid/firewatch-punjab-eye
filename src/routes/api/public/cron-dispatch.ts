@@ -87,9 +87,11 @@ async function handle(request: Request) {
     scanned: data.fires.length,
     suppressedUrban,
     wardPolygons: wards.features.length,
+    osmPolygons: osm.features.length,
+    osmMaskOk: osm.ok,
     agricultural: agricultural.length,
     source: data.source,
-    threshold: `> ${MIN_CONFIDENCE}%`,
+    threshold: `>= ${DISPATCH_MIN_CONFIDENCE}%`,
     dispatched: results.filter((r) => r.ok).length,
     results,
   });
