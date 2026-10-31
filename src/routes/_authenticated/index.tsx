@@ -11,6 +11,7 @@ import { getMyProfile } from "@/lib/profile.functions";
 import { useCroplandMask } from "@/hooks/useCroplandMask";
 import { useIndustrialMask } from "@/hooks/useIndustrialMask";
 import { useWardMask } from "@/hooks/useWardMask";
+import { shouldAutoDispatch } from "@/lib/landuseMask";
 
 const MapView = lazy(() => import("@/components/dashboard/MapView").then((m) => ({ default: m.MapView })));
 
@@ -156,15 +157,16 @@ function Dashboard() {
 
   // ------------------------------------------------------------------
   // Autonomous dispatch pipeline: any fire that is ACTIVE (outside every
-  // MC ward boundary) AND has confidence strictly > 70% (VIIRS "h" → 90,
-  // MODIS numeric) is pushed to Telegram automatically — no manual click.
+  // ward / OSM built-up mask) AND has confidence >= 70% (VIIRS "n" → 70,
+  // "h" → 90, MODIS numeric) is pushed to Telegram automatically.
+  // Waits for the OSM lookup to finish so masked fires are never sent.
   // ------------------------------------------------------------------
   const autoSentRef = useRef<Set<string>>(new Set());
   const [autoDispatched, setAutoDispatched] = useState<Set<string>>(new Set());
   useEffect(() => {
-    if (!firesLive || !ward.ready) return;
+    if (!firesLive || !ward.ready || !industrial.ready) return;
     const targets = activeFires.filter(
-      (f) => f.confidence > 70 && !autoSentRef.current.has(f.id),
+      (f) => shouldAutoDispatch(f.confidence) && !autoSentRef.current.has(f.id),
     );
     if (targets.length === 0) return;
     for (const f of targets) autoSentRef.current.add(f.id);
@@ -201,7 +203,7 @@ function Dashboard() {
       }
     })();
     return () => { cancelled = true; };
-  }, [activeFires, firesLive, ward.ready, sendDispatch]);
+  }, [activeFires, firesLive, ward.ready, industrial.ready, sendDispatch]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -212,7 +214,7 @@ function Dashboard() {
         fires={activeFires}
         firmsLive={firesLive}
         suppressedCount={suppressedCount}
-        maskReady={maskEnabled ? (ward.ready || industrial.ok || (mask.ready && mask.ok)) : ward.ready}
+        maskReady={ward.ready || industrial.ok}
         outcome={outcome}
       />
       <main className="mx-auto max-w-[1600px] px-5 py-4 space-y-4">
@@ -230,7 +232,7 @@ function Dashboard() {
               wardGeoJson={ward.geojson}
               wardCount={ward.count}
               suppressedIds={suppressedIds}
-              wardById={ward.wardById}
+              wardById={reasonById}
             />
           </div>
           <div className="lg:col-span-2 h-[520px] lg:h-[calc(100vh-330px)] lg:min-h-[560px]">
