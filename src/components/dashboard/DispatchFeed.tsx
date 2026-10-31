@@ -32,7 +32,7 @@ type Props = {
   statuses?: Record<string, FireStatus>;
   onStatusChange?: (id: string, status: FireStatus) => void;
   tileUrl?: string;
-  /** Fires already pushed automatically by the >70% confidence trigger. */
+  /** Fires already pushed automatically by the >=70% confidence trigger. */
   autoDispatched?: Set<string>;
 };
 

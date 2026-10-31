@@ -138,7 +138,7 @@ export function StatusHeader({ outcome, email, telegramHandle, dispatchCount = 0
           <Counter icon={Flame} label="Total Thermal Anomalies" value={String(total)} tone="crimson" sub="Active FIRMS detections" />
           <Counter icon={Zap} label="Peak Intensity · Max FRP" value={peakValue} tone="amber" sub="Fire Radiative Power" />
           <Counter icon={ShieldCheck} label="High Confidence Detections" value={String(highConfidence)} tone="crimson" sub="Confidence ≥ 80%" />
-          <Counter icon={ShieldAlert} label="Urban Fires Suppressed" value={maskReady ? String(suppressedCount) : "—"} tone="amber" sub="Blocked by MC ward mask" />
+          <Counter icon={ShieldAlert} label="Urban Fires Suppressed" value={maskReady ? String(suppressedCount) : "—"} tone="amber" sub="MC wards + OSM built-up/kilns" />
           <Counter icon={Truck} label="Alerts Dispatched" value={String(dispatchCount)} tone="emerald" sub="Auto + manual dispatches" />
 
         </div>

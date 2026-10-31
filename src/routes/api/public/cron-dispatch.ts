@@ -1,9 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { fetchActiveFires } from "@/lib/gee.server";
 import { isDispatched, markDispatched, pruneDedup, sendTelegram } from "@/lib/telegram.server";
+import { fetchIndustrialAreas } from "@/lib/overpass.server";
 import { loadWardCollection, computeWardMask } from "@/lib/wardMask";
+import {
+  computeLanduseMask,
+  DISPATCH_MIN_CONFIDENCE,
+  OSM_MASK_BBOX,
+  shouldAutoDispatch,
+} from "@/lib/landuseMask";
 
-const MIN_CONFIDENCE = 70; // dispatch strictly ABOVE this value (VIIRS "h" -> 90)
 const MAX_PER_RUN = 10;
 
 export const Route = createFileRoute("/api/public/cron-dispatch")({
@@ -36,16 +42,19 @@ async function handle(request: Request) {
     return Response.json({ ok: false, error: "FIRMS_MAP_KEY not configured" }, { status: 500 });
   }
 
-  // Step 2 — Strict spatial mask against the official MC Ludhiana ward
-  // boundaries (LDH_MC_Boundary_Wards). Any fire inside a ward polygon is
-  // urban/industrial and is dropped before a DB/Telegram call is spent on it.
-  const wards = await loadWardCollection();
-  const { suppressedIds } = computeWardMask(data.fires, wards);
+  // Step 2 — Suppress ONLY fires inside the MC Ludhiana ward core or an exact
+  // OSM industrial / brick-kiln / commercial / residential polygon.
+  const [wards, osm] = await Promise.all([
+    loadWardCollection(),
+    fetchIndustrialAreas(OSM_MASK_BBOX.south, OSM_MASK_BBOX.west, OSM_MASK_BBOX.north, OSM_MASK_BBOX.east),
+  ]);
+  const wardMask = computeWardMask(data.fires, wards);
+  const osmMask = computeLanduseMask(data.fires, osm.features);
 
   const agricultural: typeof data.fires = [];
   let suppressedUrban = 0;
   for (const f of data.fires) {
-    if (suppressedIds.has(f.id)) {
+    if (wardMask.suppressedIds.has(f.id) || osmMask.suppressedIds.has(f.id)) {
       suppressedUrban++;
       continue;
     }
@@ -53,7 +62,7 @@ async function handle(request: Request) {
   }
 
   const candidates = agricultural
-    .filter((f) => f.confidence > MIN_CONFIDENCE && !isDispatched(f))
+    .filter((f) => shouldAutoDispatch(f.confidence) && !isDispatched(f))
     .sort((a, b) => b.confidence - a.confidence)
     .slice(0, MAX_PER_RUN);
 
