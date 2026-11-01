@@ -102,7 +102,7 @@ function postComposite(col: Node): Node {
 
 /** ESA WorldCover 10 m cropland (class 40): only farmland can count as an agricultural burn scar. */
 const CROPLAND = fn("Image.eq", {
-  image1: fn("ImageCollection.first", { collection: fn("ImageCollection.load", { id: c("ESA/WorldCover/v200") }) }),
+  image1: fn("Collection.first", { collection: fn("ImageCollection.load", { id: c("ESA/WorldCover/v200") }) }),
   image2: img(40),
 });
 
