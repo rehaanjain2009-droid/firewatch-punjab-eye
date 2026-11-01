@@ -399,3 +399,55 @@ export const METHOD = {
   burnRule: `dNBR >= ${DNBR_BURN_THRESHOLD} AND NBR_post < ${POST_NBR_CHAR_MAX} AND ESA WorldCover v200 class 40 (cropland)`,
   auditRadiusM: AUDIT_RADIUS_M,
 };
+
+/**
+ * Hourly follow-up for dispatched alerts: Sentinel-2 revisits every ~5 days, so
+ * the scar can only be measured after a post-fire pass. Re-check each dispatched
+ * incident (2–30 days old) at most once a day until a final verdict is stored.
+ */
+export async function autoVerifyDispatched(
+  client: import("@supabase/supabase-js").SupabaseClient<import("@/integrations/supabase/types").Database>,
+  maxPerRun = 3,
+): Promise<{ checked: number; confirmed: number }> {
+  const now = Date.now();
+  const { data: incidents, error } = await client
+    .from("incidents_audit_log")
+    .select("fire_key, lat, lng, detected_at")
+    .not("dispatched_at", "is", null)
+    .gte("detected_at", new Date(now - POST_WINDOW_DAYS * 86400_000).toISOString())
+    .lte("detected_at", new Date(now - 2 * 86400_000).toISOString())
+    .order("detected_at", { ascending: false })
+    .limit(100);
+  if (error || !incidents?.length) return { checked: 0, confirmed: 0 };
+
+  const { data: prior } = await client
+    .from("burn_scar_verifications")
+    .select("fire_key, verdict, created_at")
+    .in("fire_key", incidents.map((i) => i.fire_key));
+  const done = new Set<string>();
+  const recent = new Set<string>();
+  for (const p of prior ?? []) {
+    if (p.verdict === "confirmed" || p.verdict === "not_detected") done.add(p.fire_key);
+    if (now - new Date(p.created_at).getTime() < 24 * 3600_000) recent.add(p.fire_key);
+  }
+
+  let checked = 0;
+  let confirmed = 0;
+  for (const inc of incidents) {
+    if (checked >= maxPerRun) break;
+    if (done.has(inc.fire_key) || recent.has(inc.fire_key)) continue;
+    const input = { lat: inc.lat, lng: inc.lng, acqDate: inc.detected_at.slice(0, 10) };
+    try {
+      const r = await analyseBurnScar({ ...input, withThumbnails: false });
+      await client.from("burn_scar_verifications").insert({
+        ...toVerificationRow(inc.fire_key, input, r, "auto_cron"),
+        verified_by: null,
+      });
+      checked++;
+      if (r.verdict === "confirmed") confirmed++;
+    } catch (err) {
+      console.error(`[burnscar] auto-verify ${inc.fire_key} failed:`, err);
+    }
+  }
+  return { checked, confirmed };
+}
