@@ -88,7 +88,10 @@ const maskedCol = (col: Node) =>
 
 /** Pre-fire baseline: per-pixel median of clear scenes (robust to haze that slips past the masks). */
 function preComposite(col: Node): Node {
-  return fn("ImageCollection.reduce", { collection: maskedCol(col), reducer: fn("Reducer.median", {}) });
+  return fn("Image.rename", {
+    input: fn("ImageCollection.reduce", { collection: maskedCol(col), reducer: fn("Reducer.median", {}) }),
+    names: c(BANDS),
+  });
 }
 
 /** Post-fire: earliest clear pixel after detection (before ploughing/sowing hides the char). */
@@ -241,7 +244,7 @@ export async function analyseBurnScar(input: {
   };
   if (preScenes.length === 0 || postScenes.length === 0) {
     if (input.withThumbnails && preScenes.length > 0) {
-      const pre = composite(preCol, true);
+      const pre = preComposite(preCol);
       empty.thumbnails = {
         preTrue: await eeThumbnail(token, project, trueColor(pre), at),
         postTrue: null,
@@ -252,8 +255,8 @@ export async function analyseBurnScar(input: {
     return empty;
   }
 
-  const pre = composite(preCol, true);
-  const post = composite(postCol, false);
+  const pre = preComposite(preCol);
+  const post = postComposite(postCol);
   const preNbr = nbr(pre);
   const postNbr = nbr(post);
   const dnbr = fn("Image.subtract", { image1: preNbr, image2: postNbr });
@@ -261,7 +264,10 @@ export async function analyseBurnScar(input: {
   // The char test separates real burns from paddy harvest, which also lowers NBR.
   const burned = fn("Image.and", {
     image1: fn("Image.gte", { image1: dnbr, image2: img(DNBR_BURN_THRESHOLD) }),
-    image2: fn("Image.lt", { image1: postNbr, image2: img(POST_NBR_CHAR_MAX) }),
+    image2: fn("Image.and", {
+      image1: fn("Image.lt", { image1: postNbr, image2: img(POST_NBR_CHAR_MAX) }),
+      image2: CROPLAND,
+    }),
   });
   const burnedOnly = fn("Image.updateMask", { image: burned, mask: burned });
   const valid = fn("Image.gte", { image1: dnbr, image2: img(-10) });
