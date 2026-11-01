@@ -227,7 +227,13 @@ export function DispatchFeed({ fires, live, onDispatched, places, statuses, onSt
           );
         })}
       </div>
-      <BurnScarModal fire={verifyFire} open={!!verifyFire} onOpenChange={(o) => !o && setVerifyFire(null)} tileUrl={tileUrl} />
+      <BurnScarModal
+        fire={verifyFire}
+        open={!!verifyFire}
+        onOpenChange={(o) => !o && setVerifyFire(null)}
+        placeLabel={verifyFire && places?.get(verifyFire.id)?.ok ? places.get(verifyFire.id)!.label : null}
+        assignment={verifyFire ? assignments?.get(verifyFire.id) ?? null : null}
+      />
     </div>
   );
 }
