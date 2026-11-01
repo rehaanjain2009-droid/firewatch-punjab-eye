@@ -1,0 +1,319 @@
+import { getAccessToken, getProjectId } from "./gee.server";
+import {
+  addDays,
+  AUDIT_RADIUS_M,
+  classifyVerdict,
+  DNBR_BURN_THRESHOLD,
+  hectaresToAcres,
+  POST_WINDOW_DAYS,
+  PRE_WINDOW_DAYS,
+  THUMB_HALF_WIDTH_M,
+  type BurnVerdict,
+} from "./burnScar";
+
+/**
+ * Sentinel-2 ΔNBR burn scar audit through Earth Engine's REST API.
+ * Source: COPERNICUS/S2_SR_HARMONIZED (Copernicus Sentinel-2 L2A, 10 m),
+ * cloud/shadow masked with the scene classification (SCL) band.
+ *  - pre-fire  = latest clear pixel in the PRE_WINDOW_DAYS before detection
+ *  - post-fire = earliest clear pixel from the day after detection
+ *  - NBR = (B8 NIR − B12 SWIR) / (B8 + B12); ΔNBR = NBR_pre − NBR_post
+ */
+
+type Node = Record<string, unknown>;
+const c = (v: unknown): Node => ({ constantValue: v });
+const fn = (name: string, args: Record<string, Node>): Node => ({
+  functionInvocationValue: { functionName: name, arguments: args },
+});
+const img = (v: number): Node => fn("Image.constant", { value: c(v) });
+
+const BANDS = ["B2", "B3", "B4", "B8", "B12"];
+
+/** SCL: keep dark-area (2, burn scars often land here), vegetation, bare soil, water, unclassified. */
+const MASK_BODY: Node = (() => {
+  const image = { argumentReference: "img" };
+  const scl = fn("Image.select", { input: image, bandSelectors: c(["SCL"]) });
+  const clear = fn("Image.and", {
+    image1: fn("Image.and", {
+      image1: fn("Image.gte", { image1: scl, image2: img(2) }),
+      image2: fn("Image.lte", { image1: scl, image2: img(7) }),
+    }),
+    image2: fn("Image.neq", { image1: scl, image2: img(3) }),
+  });
+  return fn("Image.select", { input: fn("Image.updateMask", { image, mask: clear }), bandSelectors: c(BANDS) });
+})();
+
+function expr(result: Node) {
+  return { expression: { result: "out", values: { out: result, maskBody: MASK_BODY } } };
+}
+
+function geometry(lat: number, lng: number) {
+  const point = fn("GeometryConstructors.Point", { coordinates: c([lng, lat]) });
+  const aoi = fn("Geometry.buffer", { geometry: point, distance: c(AUDIT_RADIUS_M) });
+  const frame = fn("Geometry.bounds", {
+    geometry: fn("Geometry.buffer", { geometry: point, distance: c(THUMB_HALF_WIDTH_M) }),
+  });
+  return { point, aoi, frame };
+}
+
+function collection(point: Node, start: string, end: string): Node {
+  return fn("Collection.filter", {
+    collection: fn("ImageCollection.load", { id: c("COPERNICUS/S2_SR_HARMONIZED") }),
+    filter: fn("Filter.and", {
+      filters: {
+        arrayValue: {
+          values: [
+            fn("Filter.intersects", { leftField: c(".all"), rightValue: point }),
+            fn("Filter.dateRangeContains", {
+              leftValue: fn("DateRange", { start: c(start), end: c(end) }),
+              rightField: c("system:time_start"),
+            }),
+          ],
+        },
+      },
+    }),
+  });
+}
+
+/** Latest-on-top (pre) or earliest-on-top (post) mosaic of SCL-masked scenes. */
+function composite(col: Node, latestOnTop: boolean): Node {
+  const masked = fn("Collection.map", {
+    collection: col,
+    baseAlgorithm: { functionDefinitionValue: { argumentNames: ["img"], body: "maskBody" } },
+  });
+  const sorted = fn("Collection.limit", { collection: masked, key: c("system:time_start"), ascending: c(latestOnTop) });
+  return fn("ImageCollection.mosaic", { collection: sorted });
+}
+
+const nbr = (image: Node) =>
+  fn("Image.normalizedDifference", { input: fn("Image.select", { input: image, bandSelectors: c(["B8", "B12"]) }) });
+const rename = (image: Node, name: string) => fn("Image.rename", { input: image, names: c([name]) });
+const addBands = (a: Node, b: Node) => fn("Image.addBands", { dstImg: a, srcImg: b });
+
+async function eeCompute<T>(token: string, project: string, result: Node): Promise<T> {
+  const res = await fetch(`https://earthengine.googleapis.com/v1/projects/${project}/value:compute`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(expr(result)),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    console.error(`[burnscar] value:compute failed [${res.status}]: ${body.slice(0, 600)}`);
+    throw new Error(`Earth Engine compute failed (HTTP ${res.status})`);
+  }
+  return ((await res.json()) as { result: T }).result;
+}
+
+async function eeThumbnail(token: string, project: string, image: Node): Promise<string | null> {
+  const create = await fetch(`https://earthengine.googleapis.com/v1/projects/${project}/thumbnails`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ ...expr(image), fileFormat: "JPEG" }),
+  });
+  if (!create.ok) {
+    console.error(`[burnscar] thumbnail create failed [${create.status}]: ${(await create.text()).slice(0, 400)}`);
+    return null;
+  }
+  const { name } = (await create.json()) as { name?: string };
+  if (!name) return null;
+  const px = await fetch(`https://earthengine.googleapis.com/v1/${name}:getPixels`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!px.ok) {
+    console.error(`[burnscar] thumbnail pixels failed [${px.status}]: ${(await px.text()).slice(0, 400)}`);
+    return null;
+  }
+  const bytes = new Uint8Array(await px.arrayBuffer());
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return `data:image/jpeg;base64,${btoa(bin)}`;
+}
+
+export type SceneInfo = { id: string; date: string };
+
+export type BurnScarResult = {
+  verdict: BurnVerdict;
+  burnedHa: number;
+  burnedAcres: number;
+  auditedHa: number;
+  clearFraction: number;
+  meanDnbrBurned: number | null;
+  meanDnbrAll: number | null;
+  meanPreNbr: number | null;
+  meanPostNbr: number | null;
+  preScenes: SceneInfo[];
+  postScenes: SceneInfo[];
+  preWindow: [string, string];
+  postWindow: [string, string];
+  thumbnails: { preTrue: string | null; postTrue: string | null; postFalse: string | null; dnbr: string | null } | null;
+};
+
+const round = (v: unknown, d = 3): number | null =>
+  typeof v === "number" && Number.isFinite(v) ? Math.round(v * 10 ** d) / 10 ** d : null;
+
+export async function analyseBurnScar(input: {
+  lat: number;
+  lng: number;
+  acqDate: string;
+  withThumbnails: boolean;
+}): Promise<BurnScarResult> {
+  const token = await getAccessToken();
+  const project = getProjectId();
+  if (!token || !project) throw new Error("Earth Engine is not configured");
+
+  const today = new Date().toISOString().slice(0, 10);
+  const preWindow: [string, string] = [addDays(input.acqDate, -PRE_WINDOW_DAYS), input.acqDate];
+  const postStart = addDays(input.acqDate, 1);
+  const postEndCap = addDays(input.acqDate, POST_WINDOW_DAYS);
+  const postWindow: [string, string] = [postStart, postEndCap < addDays(today, 1) ? postEndCap : addDays(today, 1)];
+
+  const { point, aoi, frame } = geometry(input.lat, input.lng);
+  const preCol = collection(point, preWindow[0], preWindow[1]);
+  const postCol = collection(point, postWindow[0], postWindow[1]);
+
+  const sceneList = (col: Node) => ({
+    arrayValue: {
+      values: [
+        fn("AggregateFeatureCollection.array", { collection: col, property: c("system:index") }),
+        fn("AggregateFeatureCollection.array", { collection: col, property: c("system:time_start") }),
+      ],
+    },
+  });
+  const [preRaw, postRaw] =
+    postWindow[0] >= postWindow[1]
+      ? [await eeCompute<[string[], number[]]>(token, project, sceneList(preCol)), [[], []] as [string[], number[]]]
+      : await eeCompute<[[string[], number[]], [string[], number[]]]>(token, project, {
+          arrayValue: { values: [sceneList(preCol), sceneList(postCol)] },
+        });
+  const toScenes = ([ids, times]: [string[], number[]]): SceneInfo[] =>
+    ids
+      .map((id, i) => ({ id, date: new Date(times[i]).toISOString().slice(0, 10) }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  const preScenes = toScenes(preRaw);
+  const postScenes = toScenes(postRaw);
+
+  const empty: BurnScarResult = {
+    verdict: classifyVerdict({ preScenes: preScenes.length, postScenes: postScenes.length, clearFraction: 0, burnedHa: 0 }),
+    burnedHa: 0,
+    burnedAcres: 0,
+    auditedHa: round((Math.PI * AUDIT_RADIUS_M ** 2) / 10_000, 2) ?? 0,
+    clearFraction: 0,
+    meanDnbrBurned: null,
+    meanDnbrAll: null,
+    meanPreNbr: null,
+    meanPostNbr: null,
+    preScenes,
+    postScenes,
+    preWindow,
+    postWindow,
+    thumbnails: null,
+  };
+  if (preScenes.length === 0 || postScenes.length === 0) {
+    if (input.withThumbnails && preScenes.length > 0) {
+      const pre = composite(preCol, true);
+      empty.thumbnails = {
+        preTrue: await eeThumbnail(token, project, trueColor(pre, frame)),
+        postTrue: null,
+        postFalse: null,
+        dnbr: null,
+      };
+    }
+    return empty;
+  }
+
+  const pre = composite(preCol, true);
+  const post = composite(postCol, false);
+  const preNbr = nbr(pre);
+  const postNbr = nbr(post);
+  const dnbr = fn("Image.subtract", { image1: preNbr, image2: postNbr });
+  const burned = fn("Image.gte", { image1: dnbr, image2: img(DNBR_BURN_THRESHOLD) });
+  const burnedOnly = fn("Image.updateMask", { image: burned, mask: burned });
+  const valid = fn("Image.gte", { image1: dnbr, image2: img(-10) });
+  const area = fn("Image.pixelArea", {});
+
+  const areaStack = addBands(
+    addBands(
+      rename(fn("Image.multiply", { image1: burnedOnly, image2: area }), "burned"),
+      rename(fn("Image.multiply", { image1: valid, image2: area }), "valid"),
+    ),
+    rename(area, "total"),
+  );
+  const meanStack = addBands(
+    addBands(
+      rename(fn("Image.updateMask", { image: dnbr, mask: burned }), "dnbr_burned"),
+      rename(dnbr, "dnbr_all"),
+    ),
+    addBands(rename(preNbr, "pre_nbr"), rename(postNbr, "post_nbr")),
+  );
+  const reduce = (image: Node, reducer: string) =>
+    fn("Image.reduceRegion", {
+      image,
+      reducer: fn(reducer, {}),
+      geometry: aoi,
+      scale: c(10),
+      maxPixels: c(1e8),
+    });
+
+  const statsPromise = eeCompute<[Record<string, number>, Record<string, number | null>]>(token, project, {
+    arrayValue: { values: [reduce(areaStack, "Reducer.sum"), reduce(meanStack, "Reducer.mean")] },
+  });
+  const thumbsPromise = input.withThumbnails
+    ? Promise.all([
+        eeThumbnail(token, project, trueColor(pre, frame)),
+        eeThumbnail(token, project, trueColor(post, frame)),
+        eeThumbnail(
+          token,
+          project,
+          fn("Image.visualize", {
+            image: clip(post, frame),
+            bands: c(["B12", "B8", "B4"]),
+            min: c(300),
+            max: c(4000),
+          }),
+        ),
+        eeThumbnail(
+          token,
+          project,
+          fn("Image.visualize", {
+            image: clip(dnbr, frame),
+            min: c(-0.1),
+            max: c(0.5),
+            palette: c(["1a9850", "91cf60", "d9ef8b", "fee08b", "fc8d59", "d73027"]),
+          }),
+        ),
+      ])
+    : Promise.resolve(null);
+
+  const [[sums, means], thumbs] = await Promise.all([statsPromise, thumbsPromise]);
+  const burnedHa = round((sums.burned ?? 0) / 10_000, 2) ?? 0;
+  const total = sums.total ?? 0;
+  const clearFraction = total > 0 ? round((sums.valid ?? 0) / total, 3) ?? 0 : 0;
+
+  return {
+    ...empty,
+    verdict: classifyVerdict({ preScenes: preScenes.length, postScenes: postScenes.length, clearFraction, burnedHa }),
+    burnedHa,
+    burnedAcres: hectaresToAcres(burnedHa),
+    auditedHa: round(total / 10_000, 2) ?? empty.auditedHa,
+    clearFraction,
+    meanDnbrBurned: round(means.dnbr_burned),
+    meanDnbrAll: round(means.dnbr_all),
+    meanPreNbr: round(means.pre_nbr),
+    meanPostNbr: round(means.post_nbr),
+    thumbnails: thumbs ? { preTrue: thumbs[0], postTrue: thumbs[1], postFalse: thumbs[2], dnbr: thumbs[3] } : null,
+  };
+}
+
+function clip(image: Node, frame: Node): Node {
+  return fn("Image.clipToBoundsAndScale", { input: image, geometry: frame, width: c(512), height: c(512) });
+}
+
+function trueColor(image: Node, frame: Node): Node {
+  return fn("Image.visualize", {
+    image: clip(image, frame),
+    bands: c(["B4", "B3", "B2"]),
+    min: c(200),
+    max: c(2200),
+    gamma: c(1.2),
+  });
+}
