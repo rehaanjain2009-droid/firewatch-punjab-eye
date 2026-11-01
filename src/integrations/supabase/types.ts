@@ -14,6 +14,87 @@ export type Database = {
   }
   public: {
     Tables: {
+      burn_scar_verifications: {
+        Row: {
+          acq_date: string
+          audited_ha: number | null
+          burned_acres: number
+          burned_ha: number
+          clear_fraction: number | null
+          created_at: string
+          fire_key: string
+          id: string
+          lat: number
+          lng: number
+          mean_dnbr_all: number | null
+          mean_dnbr_burned: number | null
+          mean_post_nbr: number | null
+          mean_pre_nbr: number | null
+          method: Json
+          post_scenes: Json
+          post_window_end: string | null
+          post_window_start: string | null
+          pre_scenes: Json
+          pre_window_end: string | null
+          pre_window_start: string | null
+          source: string
+          verdict: string
+          verified_by: string | null
+        }
+        Insert: {
+          acq_date: string
+          audited_ha?: number | null
+          burned_acres?: number
+          burned_ha?: number
+          clear_fraction?: number | null
+          created_at?: string
+          fire_key: string
+          id?: string
+          lat: number
+          lng: number
+          mean_dnbr_all?: number | null
+          mean_dnbr_burned?: number | null
+          mean_post_nbr?: number | null
+          mean_pre_nbr?: number | null
+          method?: Json
+          post_scenes?: Json
+          post_window_end?: string | null
+          post_window_start?: string | null
+          pre_scenes?: Json
+          pre_window_end?: string | null
+          pre_window_start?: string | null
+          source?: string
+          verdict: string
+          verified_by?: string | null
+        }
+        Update: {
+          acq_date?: string
+          audited_ha?: number | null
+          burned_acres?: number
+          burned_ha?: number
+          clear_fraction?: number | null
+          created_at?: string
+          fire_key?: string
+          id?: string
+          lat?: number
+          lng?: number
+          mean_dnbr_all?: number | null
+          mean_dnbr_burned?: number | null
+          mean_post_nbr?: number | null
+          mean_pre_nbr?: number | null
+          method?: Json
+          post_scenes?: Json
+          post_window_end?: string | null
+          post_window_start?: string | null
+          pre_scenes?: Json
+          pre_window_end?: string | null
+          pre_window_start?: string | null
+          source?: string
+          verdict?: string
+          verified_by?: string | null
+        }
+        Relationships: []
+      }
       incidents_audit_log: {
         Row: {
           assigned_officers: Json
