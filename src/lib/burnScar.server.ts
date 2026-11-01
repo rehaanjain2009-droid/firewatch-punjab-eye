@@ -63,7 +63,7 @@ function collection(point: Node, start: string, end: string): Node {
       filters: {
         arrayValue: {
           values: [
-            fn("Filter.intersects", { leftField: c(".all"), rightValue: point }),
+            fn("Filter.intersects", { leftField: c(".geo"), rightValue: point }),
             fn("Filter.dateRangeContains", {
               leftValue: fn("DateRange", { start: c(start), end: c(end) }),
               rightField: c("system:time_start"),
