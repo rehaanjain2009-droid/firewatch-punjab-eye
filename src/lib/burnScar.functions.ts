@@ -38,6 +38,6 @@ export const verifyBurnScar = createServerFn({ method: "POST" })
       };
     } catch (err) {
       console.error("[burnscar] analysis failed:", err);
-      return { ok: false as const, fireKey, error: "Sentinel-2 analysis is unavailable right now. Please try again in a minute." };
+      return { ok: false as const, fireKey, error: "Sentinel-2 analysis is unavailable right now. Please try again in a minute." as string };
     }
   });

@@ -45,7 +45,7 @@ const STATUS_OPTIONS: { key: FireStatus; label: string; cls: string }[] = [
   { key: "false_alarm", label: "False Alarm", cls: "bg-[oklch(0.82_0.17_80/0.18)] text-[oklch(0.88_0.17_80)] border-[oklch(0.82_0.17_80/0.5)]" },
 ];
 
-export function DispatchFeed({ fires, live, onDispatched, places, statuses, onStatusChange, tileUrl, autoDispatched, assignments }: Props) {
+export function DispatchFeed({ fires, live, onDispatched, places, statuses, onStatusChange, autoDispatched, assignments }: Props) {
 
   const [copied, setCopied] = useState<string | null>(null);
   const [dispatched, setDispatched] = useState<Set<string>>(new Set());
