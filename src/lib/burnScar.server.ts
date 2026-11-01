@@ -80,15 +80,28 @@ function collection(point: Node, start: string, end: string): Node {
   });
 }
 
-/** Latest-on-top (pre) or earliest-on-top (post) mosaic of SCL-masked scenes. */
-function composite(col: Node, latestOnTop: boolean): Node {
-  const masked = fn("Collection.map", {
+const maskedCol = (col: Node) =>
+  fn("Collection.map", {
     collection: col,
     baseAlgorithm: { functionDefinitionValue: { argumentNames: ["img"], body: "maskBody" } },
   });
-  const sorted = fn("Collection.limit", { collection: masked, key: c("system:time_start"), ascending: c(latestOnTop) });
+
+/** Pre-fire baseline: per-pixel median of clear scenes (robust to haze that slips past the masks). */
+function preComposite(col: Node): Node {
+  return fn("ImageCollection.reduce", { collection: maskedCol(col), reducer: fn("Reducer.median", {}) });
+}
+
+/** Post-fire: earliest clear pixel after detection (before ploughing/sowing hides the char). */
+function postComposite(col: Node): Node {
+  const sorted = fn("Collection.limit", { collection: maskedCol(col), key: c("system:time_start"), ascending: c(false) });
   return fn("ImageCollection.mosaic", { collection: sorted });
 }
+
+/** ESA WorldCover 10 m cropland (class 40): only farmland can count as an agricultural burn scar. */
+const CROPLAND = fn("Image.eq", {
+  image1: fn("ImageCollection.first", { collection: fn("ImageCollection.load", { id: c("ESA/WorldCover/v200") }) }),
+  image2: img(40),
+});
 
 const nbr = (image: Node) =>
   fn("Image.normalizedDifference", { input: fn("Image.select", { input: image, bandSelectors: c(["B8", "B12"]) }) });
