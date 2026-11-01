@@ -357,3 +357,45 @@ function trueColor(image: Node): Node {
     gamma: c(1.2),
   });
 }
+
+/** Shape stored in burn_scar_verifications (evidence record, append-only). */
+export function toVerificationRow(
+  fireKey: string,
+  input: { lat: number; lng: number; acqDate: string },
+  r: BurnScarResult,
+  source: "manual" | "auto_cron",
+) {
+  return {
+    fire_key: fireKey,
+    lat: input.lat,
+    lng: input.lng,
+    acq_date: input.acqDate,
+    verdict: r.verdict,
+    burned_ha: r.burnedHa,
+    burned_acres: r.burnedAcres,
+    audited_ha: r.auditedHa,
+    clear_fraction: r.clearFraction,
+    mean_dnbr_burned: r.meanDnbrBurned,
+    mean_dnbr_all: r.meanDnbrAll,
+    mean_pre_nbr: r.meanPreNbr,
+    mean_post_nbr: r.meanPostNbr,
+    pre_scenes: r.preScenes,
+    post_scenes: r.postScenes,
+    pre_window_start: r.preWindow[0],
+    pre_window_end: r.preWindow[1],
+    post_window_start: r.postWindow[0],
+    post_window_end: r.postWindow[1],
+    method: METHOD,
+    source,
+  };
+}
+
+export const METHOD = {
+  collection: "COPERNICUS/S2_SR_HARMONIZED (Sentinel-2 L2A, 10 m)",
+  cloudMask: "SCL in {2,4,5,6,7} and MSK_CLDPRB < 20",
+  preComposite: `median of clear pixels, ${PRE_WINDOW_DAYS} days before detection`,
+  postComposite: `earliest clear pixel, day after detection up to ${POST_WINDOW_DAYS} days`,
+  index: "NBR = (B8 - B12) / (B8 + B12); dNBR = NBR_pre - NBR_post",
+  burnRule: `dNBR >= ${DNBR_BURN_THRESHOLD} AND NBR_post < ${POST_NBR_CHAR_MAX} AND ESA WorldCover v200 class 40 (cropland)`,
+  auditRadiusM: AUDIT_RADIUS_M,
+};
