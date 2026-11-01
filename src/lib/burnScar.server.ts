@@ -104,26 +104,38 @@ async function eeCompute<T>(token: string, project: string, result: Node): Promi
   return ((await res.json()) as { result: T }).result;
 }
 
-async function eeThumbnail(token: string, project: string, image: Node): Promise<string | null> {
-  const create = await fetch(`https://earthengine.googleapis.com/v1/projects/${project}/thumbnails`, {
+type Grid = { lat: number; lng: number };
+
+/** Render a visualized image to JPEG over a square frame centred on the hotspot (image:computePixels). */
+async function eeThumbnail(token: string, project: string, image: Node, at: Grid): Promise<string | null> {
+  const size = 512;
+  const dLat = THUMB_HALF_WIDTH_M / 111_320;
+  const dLng = THUMB_HALF_WIDTH_M / (111_320 * Math.cos((at.lat * Math.PI) / 180));
+  const res = await fetch(`https://earthengine.googleapis.com/v1/projects/${project}/image:computePixels`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ ...expr(image), fileFormat: "JPEG" }),
+    body: JSON.stringify({
+      ...expr(image),
+      fileFormat: "JPEG",
+      grid: {
+        dimensions: { width: size, height: size },
+        affineTransform: {
+          scaleX: (2 * dLng) / size,
+          shearX: 0,
+          translateX: at.lng - dLng,
+          shearY: 0,
+          scaleY: -(2 * dLat) / size,
+          translateY: at.lat + dLat,
+        },
+        crsCode: "EPSG:4326",
+      },
+    }),
   });
-  if (!create.ok) {
-    console.error(`[burnscar] thumbnail create failed [${create.status}]: ${(await create.text()).slice(0, 400)}`);
+  if (!res.ok) {
+    console.error(`[burnscar] computePixels failed [${res.status}]: ${(await res.text()).slice(0, 400)}`);
     return null;
   }
-  const { name } = (await create.json()) as { name?: string };
-  if (!name) return null;
-  const px = await fetch(`https://earthengine.googleapis.com/v1/${name}:getPixels`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!px.ok) {
-    console.error(`[burnscar] thumbnail pixels failed [${px.status}]: ${(await px.text()).slice(0, 400)}`);
-    return null;
-  }
-  const bytes = new Uint8Array(await px.arrayBuffer());
+  const bytes = new Uint8Array(await res.arrayBuffer());
   let bin = "";
   for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return `data:image/jpeg;base64,${btoa(bin)}`;
@@ -212,7 +224,7 @@ export async function analyseBurnScar(input: {
     if (input.withThumbnails && preScenes.length > 0) {
       const pre = composite(preCol, true);
       empty.thumbnails = {
-        preTrue: await eeThumbnail(token, project, trueColor(pre, frame)),
+        preTrue: await eeThumbnail(token, project, trueColor(pre), at),
         postTrue: null,
         postFalse: null,
         dnbr: null,
@@ -259,13 +271,13 @@ export async function analyseBurnScar(input: {
   });
   const thumbsPromise = input.withThumbnails
     ? Promise.all([
-        eeThumbnail(token, project, trueColor(pre, frame)),
-        eeThumbnail(token, project, trueColor(post, frame)),
+        eeThumbnail(token, project, trueColor(pre), at),
+        eeThumbnail(token, project, trueColor(post), at),
         eeThumbnail(
           token,
           project,
           fn("Image.visualize", {
-            image: clip(post, frame),
+            image: post,
             bands: c(["B12", "B8", "B4"]),
             min: c(300),
             max: c(4000),
@@ -275,7 +287,7 @@ export async function analyseBurnScar(input: {
           token,
           project,
           fn("Image.visualize", {
-            image: clip(dnbr, frame),
+            image: dnbr,
             min: c(-0.1),
             max: c(0.5),
             palette: c(["1a9850", "91cf60", "d9ef8b", "fee08b", "fc8d59", "d73027"]),
@@ -304,13 +316,9 @@ export async function analyseBurnScar(input: {
   };
 }
 
-function clip(image: Node, frame: Node): Node {
-  return fn("Image.clipToBoundsAndScale", { input: image, geometry: frame, width: c(512), height: c(512) });
-}
-
-function trueColor(image: Node, frame: Node): Node {
+function trueColor(image: Node): Node {
   return fn("Image.visualize", {
-    image: clip(image, frame),
+    image,
     bands: c(["B4", "B3", "B2"]),
     min: c(200),
     max: c(2200),
