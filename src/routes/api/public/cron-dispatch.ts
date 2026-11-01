@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { fetchActiveFires } from "@/lib/gee.server";
 import { dispatchIncident, loadOfficerDirectory, recordActiveIncidents } from "@/lib/incidents.server";
 import { fetchIndustrialAreas } from "@/lib/overpass.server";
+import { autoVerifyDispatched } from "@/lib/burnScar.server";
 import { loadWardCollection, computeWardMask } from "@/lib/wardMask";
 import {
   computeLanduseMask,
@@ -78,8 +79,15 @@ async function handle(request: Request) {
     results.push({ lat: f.lat, lng: f.lng, confidence: f.confidence, ok: r.ok, status: r.status, skipped: r.skipped });
   }
 
+  // Step 4 — Sentinel-2 ΔNBR follow-up on earlier dispatched alerts (evidence records).
+  const burnScar = await autoVerifyDispatched(supabaseAdmin).catch((err) => {
+    console.error("[cron] burn scar follow-up failed:", err);
+    return { checked: 0, confirmed: 0 };
+  });
+
   return Response.json({
     ok: true,
+    burnScar,
     scanned: data.fires.length,
     suppressedUrban,
     wardPolygons: wards.features.length,
