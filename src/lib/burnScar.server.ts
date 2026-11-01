@@ -4,6 +4,7 @@ import {
   AUDIT_RADIUS_M,
   classifyVerdict,
   DNBR_BURN_THRESHOLD,
+  POST_NBR_CHAR_MAX,
   hectaresToAcres,
   POST_WINDOW_DAYS,
   PRE_WINDOW_DAYS,
@@ -38,7 +39,14 @@ const MASK_BODY: Node = (() => {
       image1: fn("Image.gte", { image1: scl, image2: img(2) }),
       image2: fn("Image.lte", { image1: scl, image2: img(7) }),
     }),
-    image2: fn("Image.neq", { image1: scl, image2: img(3) }),
+    image2: fn("Image.and", {
+      image1: fn("Image.neq", { image1: scl, image2: img(3) }),
+      // Haze and thin cloud often slip through SCL; drop pixels with ≥ 20% cloud probability.
+      image2: fn("Image.lt", {
+        image1: fn("Image.select", { input: image, bandSelectors: c(["MSK_CLDPRB"]) }),
+        image2: img(20),
+      }),
+    }),
   });
   return fn("Image.select", { input: fn("Image.updateMask", { image, mask: clear }), bandSelectors: c(BANDS) });
 })();
@@ -236,7 +244,12 @@ export async function analyseBurnScar(input: {
   const preNbr = nbr(pre);
   const postNbr = nbr(post);
   const dnbr = fn("Image.subtract", { image1: preNbr, image2: postNbr });
-  const burned = fn("Image.gte", { image1: dnbr, image2: img(DNBR_BURN_THRESHOLD) });
+  // Burned = NBR dropped by ≥ threshold AND the surface is now charred (negative NBR).
+  // The char test separates real burns from paddy harvest, which also lowers NBR.
+  const burned = fn("Image.and", {
+    image1: fn("Image.gte", { image1: dnbr, image2: img(DNBR_BURN_THRESHOLD) }),
+    image2: fn("Image.lt", { image1: postNbr, image2: img(POST_NBR_CHAR_MAX) }),
+  });
   const burnedOnly = fn("Image.updateMask", { image: burned, mask: burned });
   const valid = fn("Image.gte", { image1: dnbr, image2: img(-10) });
   const area = fn("Image.pixelArea", {});

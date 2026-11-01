@@ -5,6 +5,8 @@
 
 /** ΔNBR (pre − post) at or above this marks a 10 m pixel as burned (USGS "low severity" floor). */
 export const DNBR_BURN_THRESHOLD = 0.1;
+/** Post-fire NBR must fall below this (charred surface) — rejects harvested-but-unburned stubble. */
+export const POST_NBR_CHAR_MAX = 0;
 /** Radius around the thermal hotspot that is audited (VIIRS 375 m pixel + geolocation error). */
 export const AUDIT_RADIUS_M = 500;
 /** Half-width of the square evidence thumbnails around the hotspot. */
