@@ -50,10 +50,7 @@ function expr(result: Node) {
 function geometry(lat: number, lng: number) {
   const point = fn("GeometryConstructors.Point", { coordinates: c([lng, lat]) });
   const aoi = fn("Geometry.buffer", { geometry: point, distance: c(AUDIT_RADIUS_M) });
-  const frame = fn("Geometry.bounds", {
-    geometry: fn("Geometry.buffer", { geometry: point, distance: c(THUMB_HALF_WIDTH_M) }),
-  });
-  return { point, aoi, frame };
+  return { point, aoi };
 }
 
 function collection(point: Node, start: string, end: string): Node {
@@ -179,7 +176,8 @@ export async function analyseBurnScar(input: {
   const postEndCap = addDays(input.acqDate, POST_WINDOW_DAYS);
   const postWindow: [string, string] = [postStart, postEndCap < addDays(today, 1) ? postEndCap : addDays(today, 1)];
 
-  const { point, aoi, frame } = geometry(input.lat, input.lng);
+  const { point, aoi } = geometry(input.lat, input.lng);
+  const at = { lat: input.lat, lng: input.lng };
   const preCol = collection(point, preWindow[0], preWindow[1]);
   const postCol = collection(point, postWindow[0], postWindow[1]);
 
@@ -282,6 +280,7 @@ export async function analyseBurnScar(input: {
             min: c(300),
             max: c(4000),
           }),
+          at,
         ),
         eeThumbnail(
           token,
@@ -292,6 +291,7 @@ export async function analyseBurnScar(input: {
             max: c(0.5),
             palette: c(["1a9850", "91cf60", "d9ef8b", "fee08b", "fc8d59", "d73027"]),
           }),
+          at,
         ),
       ])
     : Promise.resolve(null);
